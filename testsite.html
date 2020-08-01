@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <!-- Sample use with `--target web` -->
+        <!--<script type="module">
+            import init, {pointless_binding} from 'build/swarm_website_visualization.js';
+
+            async function run()
+            {
+                await init();
+                pointless_binding("Hello from a Rust function binding that calls JS alert()!");
+            }
+
+            run();
+        </script> 
+        -->
+
+        <!-- Sample use with `--target no-modules` -->
+        <script src='build/swarm_website_visualization.js'></script>
+        <script>
+            const { pointless_binding } = wasm_bindgen;
+            async function run()
+            {
+                await wasm_bindgen('build/swarm_website_visualization_bg.wasm');
+                pointless_binding("Hello from a Rust function binding that calls JS alert()!");
+            }
+            run();
+        </script>
+    </head>
+    <body>
+
+    </body>
+</html>
