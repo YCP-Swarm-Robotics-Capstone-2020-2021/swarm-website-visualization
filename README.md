@@ -26,9 +26,9 @@ nodejs: https://nodejs.org/en/
 live-server: https://www.npmjs.com/package/live-server  
 `live-server` will open `testsite.html` in your browser automatically  
 ```shell
-// Install live-server
+# Install live-server
 npm install -g live-server
-// Run the following line in the root project directory
+# Run the following line in the root project directory
 live-server testsite.html
 ```
 
@@ -36,6 +36,6 @@ live-server testsite.html
 http.server docs: https://docs.python.org/3/library/http.server.html#module-http.server  
 Run the following command and then go to http://localhost:8000/testsite.html  
 ```shell
-// Run the following in the root project directory
+# Run the following in the root project directory
 python -m http.server
 ```
