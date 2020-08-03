@@ -10,6 +10,9 @@ pub struct Buffer
     context: Rc<Context>
 }
 
+/// Creates `buffer_data_$type` and `buffer_sub_data_$type` functions
+/// `$type` is the primitive type associated with `$js_array`
+/// i.e. f32 for Float32Array
 macro_rules! buffer_fn
 {
     ($type:ty, $js_array:path) =>
@@ -51,6 +54,7 @@ impl Buffer
     buffer_fn!(i32, js_sys::Int32Array);
     buffer_fn!(u32, js_sys::Uint32Array);
 
+    /// Bind `index` to the buffer memory range `offset`->`offset+size`
     pub fn bind_range(&self, index: u32, offset: i32, size: i32)
     {
         self.context.bind_buffer_range_with_i32_and_i32(self.buffer_type, index, Some(&self.internal), offset, size)

@@ -1,3 +1,5 @@
+/// WebGlVertexArrayObject wrapper
+
 use crate::gfx::
 {
     Context,
@@ -25,15 +27,18 @@ impl VertexArray
     }
 
     /// glVertexAttribPtr with default values of `false` for `normalized` and `size_of<T>()` for `stride`
+    /// This function also enables the vertex attrib array at `index`
     pub fn attrib_ptr<T>(&self, index: u32, size: i32, data_type: u32, offset: i32)
     {
         self.attrib_ptr_raw(index, size, data_type, false, size * std::mem::size_of::<T>() as i32, offset);
     }
 
+    /// glVertexAttribPtr with no default values
+    /// This function also enables the vertex attrib array at `index`
     pub fn attrib_ptr_raw(&self, index: u32, size: i32, data_type: u32, normalized: bool, stride: i32, offset: i32)
     {
         self.context.vertex_attrib_pointer_with_i32(index, size, data_type, normalized, stride, offset);
-        self.context.enable_vertex_attrib_array(0);
+        self.context.enable_vertex_attrib_array(index);
     }
 }
 

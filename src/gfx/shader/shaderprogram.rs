@@ -33,7 +33,8 @@ impl ShaderProgram
         Ok(program)
     }
 
-    pub fn compile(&self, vert_src: Option<&str>, frag_src: Option<&str>) -> Result<(), String>
+    /// Compiles the shader fragments and attaches them to the shader program
+    fn compile(&self, vert_src: Option<&str>, frag_src: Option<&str>) -> Result<(), String>
     {
 
         let vert = if let Some(src) = vert_src
@@ -62,7 +63,8 @@ impl ShaderProgram
             )
         }
     }
-    
+
+    /// Compiles a shader fragment
     fn compile_shader(&self, src: &str, shader_type: u32) -> Result<WebGlShader, String>
     {
         let shader = self.context.create_shader(shader_type)
