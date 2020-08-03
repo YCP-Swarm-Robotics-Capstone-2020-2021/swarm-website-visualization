@@ -151,7 +151,7 @@ impl SubTransformation
     /// Assembles the transformation components into a matrix
     /// Mutable since it uses/updates an internal cache
     #[allow(dead_code)]
-    pub fn as_matrix(&mut self) -> Matrix4<f32>
+    pub fn as_matrix(&mut self) -> &Matrix4<f32>
     {
         if self.has_changed
         {
@@ -159,7 +159,7 @@ impl SubTransformation
             self.has_changed = false;
         }
 
-        self.matrix_cache
+        &self.matrix_cache
     }
 
     /// Assembles the transformation components into a matrix
@@ -241,14 +241,14 @@ impl Transformation
     }
 
     #[allow(dead_code)]
-    pub fn matrix(&mut self) -> Matrix4<f32>
+    pub fn matrix(&mut self) -> &Matrix4<f32>
     {
         if self.global.has_changed || self.local.has_changed
         {
             self.matrix_cache = self.global.as_matrix() * self.local.as_matrix();
         }
 
-        self.matrix_cache
+        &self.matrix_cache
     }
 
     #[allow(dead_code)]
