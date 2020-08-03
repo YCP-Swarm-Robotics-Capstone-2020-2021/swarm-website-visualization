@@ -5,13 +5,13 @@ authors = ["YCP Swarm Robotics Team"]
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [features]
 debug = ["console_error_panic_hook"]
 
 [dependencies]
-wasm-bindgen = "0.2.63"
+wasm-bindgen = "0.2"
 
 # Logs panic messages in javascript console.
 # However it significantly increases the compiled program
@@ -20,6 +20,29 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 
 # WASM allocator to produce smaller applications
 wee_alloc = { version = "0.4.5", optional = true }
+
+cgmath = "0.17"
+js-sys = "0.3"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    # Generic JS stuff
+    'Document',
+    'Element',
+    'HtmlCanvasElement',
+    'Window',
+
+    # WebGL stuff
+    'WebGl2RenderingContext',
+
+    'WebGlVertexArrayObject',
+    'WebGlBuffer',
+
+    'WebGlProgram',
+    'WebGlShader',
+    'WebGlTexture',
+]
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"
