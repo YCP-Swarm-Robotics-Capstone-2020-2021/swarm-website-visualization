@@ -1,6 +1,5 @@
-pub const SRC: &'static str = r#"
-
-#version 300 es
+pub const SRC: &'static str =
+r#"#version 300 es
 
 layout(location = 0) in vec3 VertPos;
 
@@ -13,5 +12,4 @@ void main()
 {
     gl_Position = MVP * vec4(VertPos, 1.0f);
 }
-
 "#;

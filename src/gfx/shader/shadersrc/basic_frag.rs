@@ -1,6 +1,6 @@
-pub const SRC: &'static str = r#"
-
-#version 300 es
+pub const SRC: &'static str =
+r#"#version 300 es
+precision mediump float;
 
 out vec4 outColor;
 
