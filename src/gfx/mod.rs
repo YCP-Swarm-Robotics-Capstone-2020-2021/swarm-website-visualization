@@ -16,14 +16,15 @@ pub fn gl_get_error(context: &Rc<Context>) -> &'static str
 use std::rc::Rc;
 pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Rc<Context>, &'static str>
 {
-    let context = canvas.get_context("webgl2").or(Err("failed to get webgl2 context from canvas"))?.ok_or("failed to get webgl2 context from canvas")?;
-    let context =
-        {
-            use wasm_bindgen::JsCast;
-            context.dyn_into::<Context>().or(Err("failed to cast webgl2 context into WebGl2RenderingContext"))?
-        };
-
-    Ok(Rc::new(context))
+    match canvas.get_context("webgl2")
+    {
+        Ok(Some(context)) =>
+            {
+                use wasm_bindgen::JsCast;
+                Ok(Rc::new(context.dyn_into::<Context>().or(Err("failed to cast webgl2 context into WebGl2RenderingContext"))?))
+            },
+        _ => Err("failed to get webgl2 context from canvas")
+    }
 }
 
 pub mod transform;
