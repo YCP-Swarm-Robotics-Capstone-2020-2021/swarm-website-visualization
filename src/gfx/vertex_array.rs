@@ -33,6 +33,7 @@ impl VertexArray
     pub fn attrib_ptr_raw(&self, index: u32, size: i32, data_type: u32, normalized: bool, stride: i32, offset: i32)
     {
         self.context.vertex_attrib_pointer_with_i32(index, size, data_type, normalized, stride, offset);
+        self.context.enable_vertex_attrib_array(0);
     }
 }
 
