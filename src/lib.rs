@@ -68,5 +68,17 @@ pub fn main() -> Result<(), JsValue>
             .expect("shader program");
 
 
+    // Triangle point data
+    let triangle: [f32; 9] =
+        [
+            -0.5, -0.5,  0.0,
+            0.5, -0.5,  0.0,
+            0.0,  0.5,  0.0
+        ];
+    // Triangle point order
+    let indices: [u32; 3] = [0, 1, 2];
+
+
+
     Ok(())
 }

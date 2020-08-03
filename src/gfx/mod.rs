@@ -29,3 +29,4 @@ pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Rc<Context>, &
 pub mod transform;
 pub mod gl_object;
 pub mod shader;
+pub mod vertex_array;
