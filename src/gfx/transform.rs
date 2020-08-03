@@ -36,11 +36,13 @@ impl Default for SubTransformation
 
 impl SubTransformation
 {
+    #[allow(dead_code)]
     pub fn new() -> Self
     {
         Default::default()
     }
 
+    #[allow(dead_code)]
     pub fn scale(&mut self, scale: &Vector3<f32>)
     {
         // Multiply in the scale factor
@@ -52,6 +54,7 @@ impl SubTransformation
         self.has_changed = true;
     }
 
+    #[allow(dead_code)]
     pub fn set_scale(&mut self, scale: Vector3<f32>)
     {
         // Remove the current scale factors from position
@@ -65,6 +68,7 @@ impl SubTransformation
         self.has_changed = true;
     }
 
+    #[allow(dead_code)]
     pub fn get_scale(&self) -> &Vector3<f32>
     {
         &self.scale
@@ -72,6 +76,7 @@ impl SubTransformation
 
     /// Rotate orientation with a quaternion
     /// `rotation` MUST be normalized
+    #[allow(dead_code)]
     pub fn rotate_quat(&mut self, rotation: &Quaternion<f32>)
     {
         // Apply rotation and normalize result
@@ -86,6 +91,7 @@ impl SubTransformation
 
     /// Rotate orientation with an angle (in radians) and axis of rotation
     /// `axis` MUST be normalized
+    #[allow(dead_code)]
     pub fn rotate_angle_axis<A: Into<Rad<f32>>>(&mut self, angle: A, axis: &Vector3<f32>)
     {
         self.rotate_quat(&Quaternion::from_axis_angle(*axis, angle))
@@ -93,6 +99,7 @@ impl SubTransformation
 
     /// Set orientation with a quaternion
     /// `orientation` MUST be normalized
+    #[allow(dead_code)]
     pub fn set_orientation_quat(&mut self, orientation: Quaternion<f32>)
     {
         // Remove current orientation from the position
@@ -107,16 +114,19 @@ impl SubTransformation
 
     /// Set orientation with an angle (in radians) and axis of rotation
     /// `axis` MUST be normalized
+    #[allow(dead_code)]
     pub fn set_orientation_angle_axis<A: Into<Rad<f32>>>(&mut self, angle: A, axis: &Vector3<f32>)
     {
         self.set_orientation_quat(Quaternion::from_axis_angle(*axis, angle))
     }
 
+    #[allow(dead_code)]
     pub fn get_orientation(&self) -> &Quaternion<f32>
     {
         &self.orientation
     }
 
+    #[allow(dead_code)]
     pub fn translate(&mut self, translation: &Vector3<f32>)
     {
         self.translation += *translation;
@@ -124,6 +134,7 @@ impl SubTransformation
         self.has_changed = true;
     }
 
+    #[allow(dead_code)]
     pub fn set_translation(&mut self, position: Vector3<f32>)
     {
         self.translation = position;
@@ -131,6 +142,7 @@ impl SubTransformation
         self.has_changed = true;
     }
 
+    #[allow(dead_code)]
     pub fn get_translation(&self) -> &Vector3<f32>
     {
         &self.translation
@@ -138,6 +150,7 @@ impl SubTransformation
 
     /// Assembles the transformation components into a matrix
     /// Mutable since it uses/updates an internal cache
+    #[allow(dead_code)]
     pub fn as_matrix(&mut self) -> Matrix4<f32>
     {
         if self.has_changed
@@ -152,6 +165,7 @@ impl SubTransformation
     /// Assembles the transformation components into a matrix
     /// Less efficient since three matrix multiplications are performed
     /// on each call, but doesn't need a mutable reference
+    #[allow(dead_code)]
     pub fn as_matrix_uncached(&self) -> Matrix4<f32>
     {
         Matrix4::from_translation(self.translation) *
@@ -188,38 +202,45 @@ impl Default for Transformation
 
 impl Transformation
 {
+    #[allow(dead_code)]
     pub fn new() -> Self
     {
         Default::default()
     }
 
     /// Reset all transformations
+    #[allow(dead_code)]
     pub fn reset(&mut self)
     {
         *self = Default::default()
     }
 
+    #[allow(dead_code)]
     pub fn scale(&self) -> Vector3<f32>
     {
         self.global.get_scale().mul_element_wise(*self.local.get_scale())
     }
 
+    #[allow(dead_code)]
     pub fn orientation(&self) -> Quaternion<f32>
     {
         self.global.orientation * self.local.orientation
     }
 
+    #[allow(dead_code)]
     pub fn translation(&self) -> Vector3<f32>
     {
         self.global.translation + self.local.translation
     }
 
-    // Relatively scaled base size
+    /// Relatively scaled base size
+    #[allow(dead_code)]
     pub fn size(&self) -> Vector3<f32>
     {
         self.base_size.mul_element_wise(self.scale())
     }
 
+    #[allow(dead_code)]
     pub fn matrix(&mut self) -> Matrix4<f32>
     {
         if self.global.has_changed || self.local.has_changed
@@ -230,6 +251,7 @@ impl Transformation
         self.matrix_cache
     }
 
+    #[allow(dead_code)]
     pub fn matrix_uncached(&self) -> Matrix4<f32>
     {
         self.global.as_matrix_uncached() * self.local.as_matrix_uncached()
