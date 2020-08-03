@@ -56,13 +56,17 @@ impl ShaderProgram
         }
         else
         {
-            Err(self.context.get_program_info_log(&self.internal).unwrap_or_else(|| "Unknown error linking shader".to_string()))
+            Err(
+                self.context.get_program_info_log(&self.internal)
+                    .unwrap_or_else(|| "Unknown error linking shader".to_string())
+            )
         }
     }
     
     fn compile_shader(&self, src: &str, shader_type: u32) -> Result<WebGlShader, String>
     {
-        let shader = self.context.create_shader(shader_type).ok_or("Shader creation failed")?;
+        let shader = self.context.create_shader(shader_type)
+            .ok_or(format!("{} shader creation failed", ShaderProgram::shader_name(shader_type)).to_string())?;
         self.context.shader_source(&shader, &src);
         self.context.compile_shader(&shader);
         self.context.attach_shader(&self.internal, &shader);
@@ -73,7 +77,9 @@ impl ShaderProgram
         }
         else
         {
-            Err(self.context.get_shader_info_log(&shader).unwrap_or_else(|| format!("Unknown error creating {} shader", ShaderProgram::shader_name(shader_type))))
+            Err(format!("{} shader compile error: {}", ShaderProgram::shader_name(shader_type),
+                self.context.get_shader_info_log(&shader).unwrap_or_else(|| "Unknown (error while getting the error :/ )".to_string())
+            ))
         }
     }
 
