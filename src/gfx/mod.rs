@@ -30,3 +30,4 @@ pub mod transform;
 pub mod gl_object;
 pub mod shader;
 pub mod vertex_array;
+pub mod buffer;
