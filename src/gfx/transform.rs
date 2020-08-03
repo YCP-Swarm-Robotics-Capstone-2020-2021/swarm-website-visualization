@@ -1,0 +1,237 @@
+use cgmath::
+{
+    prelude::*,
+    vec3,
+    Vector3,
+    Quaternion,
+    Rad,
+    Matrix4,
+};
+
+/// Holds a scale, orientation, and position for a transformation
+#[derive(Clone, Copy, Debug)]
+pub struct SubTransformation
+{
+    scale: Vector3<f32>,
+    orientation: Quaternion<f32>,
+    translation: Vector3<f32>,
+    has_changed: bool,
+    matrix_cache: Matrix4<f32>,
+}
+
+impl Default for SubTransformation
+{
+    fn default() -> Self
+    {
+        SubTransformation
+        {
+            scale: vec3(1.0, 1.0, 1.0),
+            orientation: Quaternion::from_axis_angle(vec3(0.0, 0.0, 0.0), Rad(0.0)),
+            translation: vec3(0.0, 0.0, 0.0),
+            has_changed: true,
+            matrix_cache: cgmath::Transform::one()
+        }
+    }
+}
+
+impl SubTransformation
+{
+    pub fn new() -> Self
+    {
+        Default::default()
+    }
+
+    pub fn scale(&mut self, scale: &Vector3<f32>)
+    {
+        // Multiply in the scale factor
+        self.scale.mul_assign_element_wise(*scale);
+
+        // Scale the current position by the scale factor
+        self.translation.mul_assign_element_wise(*scale);
+
+        self.has_changed = true;
+    }
+
+    pub fn set_scale(&mut self, scale: Vector3<f32>)
+    {
+        // Remove the current scale factors from position
+        self.translation.div_assign_element_wise(scale);
+
+        self.scale = scale;
+
+        // Scale the position by the new scale value
+        self.translation.mul_assign_element_wise(scale);
+
+        self.has_changed = true;
+    }
+
+    pub fn get_scale(&self) -> &Vector3<f32>
+    {
+        &self.scale
+    }
+
+    /// Rotate orientation with a quaternion
+    /// `rotation` MUST be normalized
+    pub fn rotate_quat(&mut self, rotation: &Quaternion<f32>)
+    {
+        // Apply rotation and normalize result
+        self.orientation = self.orientation * rotation;
+        self.orientation = self.orientation.normalize();
+
+        // Apply rotation to position
+        self.translation = self.orientation * self.translation;
+
+        self.has_changed = true;
+    }
+
+    /// Rotate orientation with an angle (in radians) and axis of rotation
+    /// `axis` MUST be normalized
+    pub fn rotate_angle_axis<A: Into<Rad<f32>>>(&mut self, angle: A, axis: &Vector3<f32>)
+    {
+        self.rotate_quat(&Quaternion::from_axis_angle(*axis, angle))
+    }
+
+    /// Set orientation with a quaternion
+    /// `orientation` MUST be normalized
+    pub fn set_orientation_quat(&mut self, orientation: Quaternion<f32>)
+    {
+        // Remove current orientation from the position
+        self.translation = (self.orientation.conjugate() * orientation).normalize() * self.translation;
+        // Set new orientation
+        self.orientation = orientation;
+        // Apply new orientation to position
+        self.translation = self.orientation * self.translation;
+
+        self.has_changed = true;
+    }
+
+    /// Set orientation with an angle (in radians) and axis of rotation
+    /// `axis` MUST be normalized
+    pub fn set_orientation_angle_axis<A: Into<Rad<f32>>>(&mut self, angle: A, axis: &Vector3<f32>)
+    {
+        self.set_orientation_quat(Quaternion::from_axis_angle(*axis, angle))
+    }
+
+    pub fn get_orientation(&self) -> &Quaternion<f32>
+    {
+        &self.orientation
+    }
+
+    pub fn translate(&mut self, translation: &Vector3<f32>)
+    {
+        self.translation += *translation;
+
+        self.has_changed = true;
+    }
+
+    pub fn set_translation(&mut self, position: Vector3<f32>)
+    {
+        self.translation = position;
+
+        self.has_changed = true;
+    }
+
+    pub fn get_translation(&self) -> &Vector3<f32>
+    {
+        &self.translation
+    }
+
+    /// Assembles the transformation components into a matrix
+    /// Mutable since it uses/updates an internal cache
+    pub fn as_matrix(&mut self) -> Matrix4<f32>
+    {
+        if self.has_changed
+        {
+            self.matrix_cache = self.as_matrix_uncached();
+            self.has_changed = false;
+        }
+
+        self.matrix_cache
+    }
+
+    /// Assembles the transformation components into a matrix
+    /// Less efficient since three matrix multiplications are performed
+    /// on each call, but doesn't need a mutable reference
+    pub fn as_matrix_uncached(&self) -> Matrix4<f32>
+    {
+        Matrix4::from_translation(self.translation) *
+            Matrix4::from(self.orientation) *
+            Matrix4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z)
+    }
+}
+
+/// Holds a base size and global/local transformations
+#[derive(Clone, Copy, Debug)]
+pub struct Transformation
+{
+    pub base_size: Vector3<f32>,
+
+    pub global: SubTransformation,
+    pub local: SubTransformation,
+
+    matrix_cache: Matrix4<f32>,
+}
+
+impl Default for Transformation
+{
+    fn default() -> Self
+    {
+        Transformation
+        {
+            base_size: vec3(1.0, 1.0, 1.0),
+            global: Default::default(),
+            local: Default::default(),
+            matrix_cache: cgmath::Transform::one()
+        }
+    }
+}
+
+impl Transformation
+{
+    pub fn new() -> Self
+    {
+        Default::default()
+    }
+
+    /// Reset all transformations
+    pub fn reset(&mut self)
+    {
+        *self = Default::default()
+    }
+
+    pub fn scale(&self) -> Vector3<f32>
+    {
+        self.global.get_scale().mul_element_wise(*self.local.get_scale())
+    }
+
+    pub fn orientation(&self) -> Quaternion<f32>
+    {
+        self.global.orientation * self.local.orientation
+    }
+
+    pub fn translation(&self) -> Vector3<f32>
+    {
+        self.global.translation + self.local.translation
+    }
+
+    // Relatively scaled base size
+    pub fn size(&self) -> Vector3<f32>
+    {
+        self.base_size.mul_element_wise(self.scale())
+    }
+
+    pub fn matrix(&mut self) -> Matrix4<f32>
+    {
+        if self.global.has_changed || self.local.has_changed
+        {
+            self.matrix_cache = self.global.as_matrix() * self.local.as_matrix();
+        }
+
+        self.matrix_cache
+    }
+
+    pub fn matrix_uncached(&self) -> Matrix4<f32>
+    {
+        self.global.as_matrix_uncached() * self.local.as_matrix_uncached()
+    }
+}
