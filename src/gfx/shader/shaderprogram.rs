@@ -1,8 +1,8 @@
-use crate::
+use crate::gfx::
 {
     Context,
     gl_get_error,
-    gfx::gl_object::GLObject
+    gl_object::GLObject
 };
 use std::
 {

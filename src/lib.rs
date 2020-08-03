@@ -15,7 +15,7 @@ use web_sys::
     WebGl2RenderingContext,
 
 };
-use std::rc::Rc;
+
 use crate::
 {
     gfx::
@@ -27,22 +27,6 @@ use crate::
         }
     }
 };
-
-type Context = WebGl2RenderingContext;
-fn gl_get_error(context: &Rc<Context>) -> &'static str
-{
-    match context.get_error()
-    {
-        Context::NO_ERROR => "NO_ERROR",
-        Context::INVALID_ENUM => "INVALID_ENUM",
-        Context::INVALID_VALUE => "INVALID_VALUE",
-        Context::INVALID_OPERATION => "INVALID_OPERATION",
-        Context::INVALID_FRAMEBUFFER_OPERATION => "INVALID_FRAMEBUFFER_OPERATION",
-        Context::OUT_OF_MEMORY => "OUT_OF_MEMORY",
-        Context::CONTEXT_LOST_WEBGL => "CONTEXT_LOST_WEBGL",
-        _ => "UNKNOWN_ERROR"
-    }
-}
 
 mod gfx;
 
@@ -76,8 +60,8 @@ pub fn main() -> Result<(), JsValue>
             let elem = document.get_element_by_id("canvas").expect("canvas handle");
             elem.dyn_into::<HtmlCanvasElement>()?
         };
-    let context = canvas.get_context("webgl2")?.expect("webgl context").dyn_into::<Context>()?;
-    let context = Rc::new(context);
+
+    let context = gfx::new_context(&canvas)?;
 
     let shaderprog =
         ShaderProgram::new(&context, Some(shadersrc::BASIC_VERT), Some(shadersrc::BASIC_FRAG))
