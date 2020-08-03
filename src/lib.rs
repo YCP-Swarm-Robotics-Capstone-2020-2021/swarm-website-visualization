@@ -11,20 +11,21 @@ use web_sys::
     Window,
     Document,
     HtmlCanvasElement,
-
-    WebGl2RenderingContext,
-
 };
 
 use crate::
 {
     gfx::
     {
+        Context,
+        gl_object::GLObject,
         shader::
         {
             shaderprogram::ShaderProgram,
             shadersrc
-        }
+        },
+        vertex_array::VertexArray,
+        buffer::Buffer
     }
 };
 
@@ -66,6 +67,7 @@ pub fn main() -> Result<(), JsValue>
     let shaderprog =
         ShaderProgram::new(&context, Some(shadersrc::BASIC_VERT), Some(shadersrc::BASIC_FRAG))
             .expect("shader program");
+    shaderprog.bind();
 
 
     // Triangle point data
@@ -78,7 +80,23 @@ pub fn main() -> Result<(), JsValue>
     // Triangle point order
     let indices: [u32; 3] = [0, 1, 2];
 
+    let va = VertexArray::new(&context).expect("vertex array");
 
+    let vb = Buffer::new(&context, Context::ARRAY_BUFFER).expect("array buffer");
+    let eb = Buffer::new(&context, Context::ELEMENT_ARRAY_BUFFER).expect("element array buffer");
+
+    va.bind();
+    vb.bind();
+    vb.buffer_data_f32(&triangle, Context::STATIC_DRAW);
+
+    eb.bind();
+    eb.buffer_data_u32(&indices, Context::STATIC_DRAW);
+
+    va.attrib_ptr::<f32>(0, 3, Context::FLOAT, 0);
+
+    context.clear_color(0.0, 0.0, 0.0, 1.0);
+    context.clear(Context::COLOR_BUFFER_BIT);
+    context.draw_elements_with_i32(Context::TRIANGLES, indices.len() as i32, Context::UNSIGNED_INT, 0);
 
     Ok(())
 }
