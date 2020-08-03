@@ -33,6 +33,12 @@ impl ShaderProgram
         Ok(program)
     }
 
+    pub fn add_uniform_block_binding(&self, block_name: &str, binding: u32)
+    {
+        let index = self.context.get_uniform_block_index(&self.internal, block_name);
+        self.context.uniform_block_binding(&self.internal, index, binding);
+    }
+
     /// Compiles the shader fragments and attaches them to the shader program
     fn compile(&self, vert_src: Option<&str>, frag_src: Option<&str>) -> Result<(), String>
     {

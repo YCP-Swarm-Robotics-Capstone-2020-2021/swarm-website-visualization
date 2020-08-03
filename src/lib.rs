@@ -22,12 +22,15 @@ use crate::
         shader::
         {
             shaderprogram::ShaderProgram,
-            shadersrc
+            shadersrc,
+            uniform_buffer::UniformBuffer,
         },
         vertex_array::VertexArray,
-        buffer::Buffer
+        buffer::Buffer,
+        transform::Transformation,
     }
 };
+use cgmath::{Matrix4, Vector3, vec3};
 
 mod gfx;
 
@@ -93,6 +96,26 @@ pub fn main() -> Result<(), JsValue>
     eb.buffer_data_u32(&indices, Context::STATIC_DRAW);
 
     va.attrib_ptr::<f32>(0, 3, Context::FLOAT, 0);
+
+    let mut transformation = Transformation::new();
+
+    let mut ubo = UniformBuffer::new(
+        &context,
+        std::mem::size_of::<Matrix4<f32>>() as i32,
+        std::mem::size_of::<Vector3<f32>>() as i32,
+        Context::STATIC_DRAW
+    ).expect("uniform buffer");
+    ubo.bind();
+
+    ubo.add_vert_block(&shaderprog, "VertData");
+    transformation.global.translate(&vec3(-0.5, 0.0, 0.0));
+    let mvp: &[f32; 16] = transformation.matrix().as_ref();
+    ubo.buffer_vert_data_f32(mvp);
+
+    ubo.add_frag_block(&shaderprog, "FragData");
+    let color: Vector3<f32> = vec3(253.0/255.0, 94.0/255.0, 0.0);
+    let buff: &[f32; 3] = color.as_ref();
+    ubo.buffer_frag_data_f32(buff);
 
     context.clear_color(0.0, 0.0, 0.0, 1.0);
     context.clear(Context::COLOR_BUFFER_BIT);
