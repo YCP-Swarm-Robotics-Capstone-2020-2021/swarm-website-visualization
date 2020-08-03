@@ -12,13 +12,6 @@ pub struct Buffer
 
 macro_rules! buffer_fn
 {
-    ($array_type:ident, $self:ident, $data:ident, $draw_type:expr) =>
-    {unsafe
-    {
-        let buff = js_sys::$array_type::view(&$data);
-        $self.context.buffer_data_with_array_buffer_view($self.buffer_type, &buff, $draw_type);
-    }};
-
     ($type:ty, $js_array:path) =>
     {paste!
     {
