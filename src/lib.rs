@@ -80,7 +80,7 @@ pub fn main() -> Result<(), JsValue>
     let context = Rc::new(context);
 
     let shaderprog =
-        ShaderProgram::new(&context, Some(shadersrc::basic_vert::SRC), Some(shadersrc::basic_frag::SRC))
+        ShaderProgram::new(&context, Some(shadersrc::BASIC_VERT), Some(shadersrc::BASIC_FRAG))
             .expect("shader program");
 
 

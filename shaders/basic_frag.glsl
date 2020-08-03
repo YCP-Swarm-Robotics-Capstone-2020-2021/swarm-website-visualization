@@ -1,5 +1,4 @@
-pub const SRC: &'static str =
-r#"#version 300 es
+#version 300 es
 precision mediump float;
 
 out vec4 outColor;
@@ -13,4 +12,3 @@ void main()
 {
     outColor = vec4(color, 1.0f);
 }
-"#;
