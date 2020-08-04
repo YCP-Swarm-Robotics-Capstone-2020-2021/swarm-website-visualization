@@ -18,6 +18,7 @@ macro_rules! buffer_fn
     ($type:ty, $js_array:path) =>
     {paste!
     {
+        #[allow(dead_code)]
         pub fn [<buffer_data_ $type>](&self, data: &[$type], draw_type: u32)
         {
             unsafe
@@ -27,6 +28,7 @@ macro_rules! buffer_fn
                 }
         }
 
+        #[allow(dead_code)]
         pub fn [<buffer_sub_data_ $type>](&self, offset: i32, data: &[$type])
         {
             unsafe
