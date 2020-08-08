@@ -21,6 +21,9 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 # WASM allocator to produce smaller applications
 wee_alloc = { version = "0.4.5", optional = true }
 
+lazy_static = "1.4.0"
+gen-vec = "0.3.0"
+twox-hash = "1.5.0"
 paste = "1.0.0"
 
 cgmath = "0.17"
@@ -37,6 +40,7 @@ features = [
 
     # WebGL stuff
     'WebGl2RenderingContext',
+    "WebGlContextEvent",
 
     'WebGlVertexArrayObject',
     'WebGlBuffer',

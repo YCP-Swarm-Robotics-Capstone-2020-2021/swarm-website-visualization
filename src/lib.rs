@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate lazy_static;
 use wasm_bindgen::
 {
     prelude::*,
@@ -12,6 +14,7 @@ use web_sys::
     Document,
     HtmlCanvasElement,
 };
+use std::rc::Rc;
 
 use crate::
 {
@@ -23,7 +26,7 @@ use crate::
         {
             shaderprogram::ShaderProgram,
             shadersrc,
-            uniform_buffer::UniformBuffer,
+            //uniform_buffer::UniformBuffer,
         },
         vertex_array::VertexArray,
         buffer::Buffer,
@@ -43,6 +46,8 @@ extern
 {
     /// Javascript `alert` function
     fn alert(s: &str);
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
 }
 
 #[wasm_bindgen]
@@ -64,10 +69,27 @@ pub fn main() -> Result<(), JsValue>
             let elem = document.get_element_by_id("canvas").expect("canvas handle");
             elem.dyn_into::<HtmlCanvasElement>()?
         };
-
     let context = gfx::new_context(&canvas)?;
 
-    let shaderprog =
+    {
+        let callback = Closure::wrap(Box::new(move |event: web_sys::WebGlContextEvent|
+            {
+                event.prevent_default();
+                alert("Context lost");
+            }) as Box<dyn FnMut(_)>);
+        canvas.add_event_listener_with_callback("webglcontextlost", callback.as_ref().unchecked_ref());
+        callback.forget();
+
+        let callback = Closure::wrap(Box::new(move |context: Context|
+            {
+                alert("Context restored");
+                //run_visualization(&Rc::new(context), true);
+            }) as Box<dyn FnMut(_)>);
+        canvas.add_event_listener_with_callback("webglcontextrestored", callback.as_ref().unchecked_ref());
+        callback.forget();
+    }
+
+    let mut shaderprog =
         ShaderProgram::new(&context, Some(shadersrc::BASIC_VERT), Some(shadersrc::BASIC_FRAG))
             .expect("shader program");
     shaderprog.bind();
@@ -83,14 +105,15 @@ pub fn main() -> Result<(), JsValue>
     // Triangle point order
     let indices: [u32; 3] = [0, 1, 2];
 
-    let va = VertexArray::new(&context).expect("vertex array");
+    let mut va = VertexArray::new(&context).expect("vertex array");
 
-    let vb = Buffer::new(&context, Context::ARRAY_BUFFER).expect("array buffer");
-    let eb = Buffer::new(&context, Context::ELEMENT_ARRAY_BUFFER).expect("element array buffer");
+    let mut vb = Buffer::new(&context, Context::ARRAY_BUFFER).expect("array buffer");
+    let mut eb = Buffer::new(&context, Context::ELEMENT_ARRAY_BUFFER).expect("element array buffer");
 
     va.bind();
     vb.bind();
     vb.buffer_data_f32(&triangle, Context::STATIC_DRAW);
+    vb.reload(&context);
 
     eb.bind();
     eb.buffer_data_u32(&indices, Context::STATIC_DRAW);
@@ -99,23 +122,23 @@ pub fn main() -> Result<(), JsValue>
 
     let mut transformation = Transformation::new();
 
-    let mut ubo = UniformBuffer::new(
+    let ub_handle = shaderprog.new_uniform_buffer(
         &context,
         std::mem::size_of::<Matrix4<f32>>() as i32,
         std::mem::size_of::<Vector3<f32>>() as i32,
         Context::STATIC_DRAW
-    ).expect("uniform buffer");
-    ubo.bind();
+    ).expect("uniform buffer handle");
+    shaderprog.bind_uniform_buffer(ub_handle).expect("bound uniform buffer");
 
-    ubo.add_vert_block(&shaderprog, "VertData");
+    shaderprog.add_vert_uniform_block(ub_handle, "VertData").expect("VertData uniform block");
     transformation.global.translate(&vec3(-0.5, 0.0, 0.0));
-    let mvp: &[f32; 16] = transformation.matrix().as_ref();
-    ubo.buffer_vert_data_f32(mvp);
+    let buff: &[f32; 16] = transformation.matrix().as_ref();
+    shaderprog.buffer_vert_uniform_data_f32(ub_handle, buff).expect("transformation buffered");
 
-    ubo.add_frag_block(&shaderprog, "FragData");
+    shaderprog.add_frag_uniform_block(ub_handle, "FragData").expect("FragData uniform block");
     let color: Vector3<f32> = vec3(253.0/255.0, 94.0/255.0, 0.0);
     let buff: &[f32; 3] = color.as_ref();
-    ubo.buffer_frag_data_f32(buff);
+    shaderprog.buffer_frag_uniform_data_f32(ub_handle, buff).expect("color buffered");
 
     context.clear_color(0.0, 0.0, 0.0, 1.0);
     context.clear(Context::COLOR_BUFFER_BIT);
