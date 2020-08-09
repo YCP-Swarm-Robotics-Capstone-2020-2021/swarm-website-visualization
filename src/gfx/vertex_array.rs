@@ -3,11 +3,14 @@
 use crate::gfx::
 {
     Context,
+    GlManager,
+    GfxError,
     gl_get_errors,
     gl_object::GLObject
 };
 use web_sys::WebGlVertexArrayObject;
 use std::rc::Rc;
+use gen_vec::Index;
 
 #[derive(Debug, Copy, Clone)]
 struct AttribPointer(u32, i32, u32, bool, i32, i32);
@@ -21,19 +24,20 @@ pub struct VertexArray
 
 impl VertexArray
 {
-    fn new_vertex_array(context: &Context) -> Result<WebGlVertexArrayObject, String>
+    fn new_vertex_array(context: &Context) -> Result<WebGlVertexArrayObject, GfxError>
     {
-        context.create_vertex_array().ok_or_else(|| format!("Error creating vertex array: {}", gl_get_errors(context)))
+        context.create_vertex_array().ok_or_else(|| GfxError::VertexArrayCreationError(gl_get_errors(context)))
     }
 
-    pub fn new(context: &Rc<Context>) -> Result<VertexArray, String>
+    pub fn new(manager: &GlManager) -> Result<Index, GfxError>
     {
-        Ok(VertexArray
+        let va = VertexArray
         {
-            internal: VertexArray::new_vertex_array(&context)?,
-            context: Rc::clone(context),
+            internal: VertexArray::new_vertex_array(&manager.context())?,
+            context: Rc::clone(&manager.context()),
             attrib_ptrs: vec![]
-        })
+        };
+        Ok(manager.add_gl_object(va))
     }
 
     /// glVertexAttribPtr with default values of `false` for `normalized` and `size_of<T>()` for `stride`
@@ -68,8 +72,7 @@ impl GLObject for VertexArray
     {
         self.context.bind_vertex_array(None);
     }
-    type ReloadError = String;
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), Self::ReloadError>
+    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
         self.context = Rc::clone(&context);
         self.internal = VertexArray::new_vertex_array(&self.context)?;

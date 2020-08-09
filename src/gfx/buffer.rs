@@ -1,7 +1,16 @@
-use crate::gfx::{Context, gl_get_errors, gl_object::GLObject};
 use std::rc::Rc;
 use web_sys::{WebGlBuffer};
 use paste::paste;
+use gen_vec::Index;
+use crate::gfx::
+{
+    Context,
+    GlManager,
+    GfxError,
+    gl_get_errors,
+    gl_object::GLObject,
+};
+use crate::gfx::GfxError::BufferCreationError;
 
 /// A single item in the buffer
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
@@ -64,22 +73,23 @@ macro_rules! buffer_fn
 
 impl Buffer
 {
-    fn new_buffer(context: &Context) -> Result<WebGlBuffer, String>
+    fn new_buffer(context: &Context) -> Result<WebGlBuffer, GfxError>
     {
-        context.create_buffer().ok_or_else(|| format!("Error creating buffer: {}", gl_get_errors(context)))
+        context.create_buffer().ok_or_else(|| GfxError::BufferCreationError(gl_get_errors(context)))
     }
 
-    pub fn new(context: &Rc<Context>, buffer_type: u32) -> Result<Buffer, String>
+    pub fn new(manager: &GlManager, buffer_type: u32) -> Result<Index, GfxError>
     {
-        Ok(Buffer
+        let buffer = Buffer
         {
-            internal: Buffer::new_buffer(context)?,
-            context: Rc::clone(context),
+            internal: Buffer::new_buffer(&manager.context())?,
+            context: Rc::clone(&manager.context()),
             buffer_type,
             draw_type: 0,
             buffer: vec![],
             range_bindings: vec![]
-        })
+        };
+        Ok(manager.add_gl_object(buffer))
     }
 
     buffer_fn!(f32, js_sys::Float32Array);
@@ -139,8 +149,7 @@ impl GLObject for Buffer
     {
         self.context.bind_buffer(self.buffer_type, None);
     }
-    type ReloadError = String;
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), Self::ReloadError>
+    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
         self.context = Rc::clone(&context);
         self.internal = Buffer::new_buffer(&self.context)?;

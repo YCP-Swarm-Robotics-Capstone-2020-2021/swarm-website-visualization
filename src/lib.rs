@@ -71,7 +71,7 @@ pub fn main() -> Result<(), JsValue>
         };
     let context = gfx::new_context(&canvas)?;
 
-    {
+/*    {
         let callback = Closure::wrap(Box::new(move |event: web_sys::WebGlContextEvent|
             {
                 event.prevent_default();
@@ -142,7 +142,7 @@ pub fn main() -> Result<(), JsValue>
 
     context.clear_color(0.0, 0.0, 0.0, 1.0);
     context.clear(Context::COLOR_BUFFER_BIT);
-    context.draw_elements_with_i32(Context::TRIANGLES, indices.len() as i32, Context::UNSIGNED_INT, 0);
+    context.draw_elements_with_i32(Context::TRIANGLES, indices.len() as i32, Context::UNSIGNED_INT, 0);*/
 
     Ok(())
 }

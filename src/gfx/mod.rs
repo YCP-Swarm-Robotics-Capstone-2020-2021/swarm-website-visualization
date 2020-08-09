@@ -1,4 +1,57 @@
+//! All things graphics related
+
+use std::
+{
+    rc::Rc,
+    sync::{Arc, RwLock},
+};
+use gen_vec::{Index, closed::ClosedGenVec};
+use crate::gfx::
+{
+    shader::shaderprogram::ShaderType,
+    gl_object::GLObject,
+};
+
 pub type Context = web_sys::WebGl2RenderingContext;
+
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
+pub enum GfxError
+{
+    /// Errors from glGetErrors()
+    GlErrors(Vec<GlError>),
+
+    /// Invalid `Index` handle
+    InvalidHandle(Index),
+
+    /// All shader `src` parameters are `None`
+    NoShaderSource(String),
+    /// Error creating a new shader program
+    ShaderProgramCreationError(String),
+    /// Error creating a new shader fragment
+    ShaderCreationError(ShaderType, String),
+    /// Error compiling shader fragment
+    ShaderCompilationError(ShaderType, String),
+    /// Error linking shader fragments to shader program
+    ShaderProgramLinkingError(String),
+    /// Invalid block name for uniform buffer binding
+    InvalidUniformBlockName(String),
+
+    /// Error creating a new buffer
+    BufferCreationError(String),
+
+    /// Error creating a new vertex array
+    VertexArrayCreationError(String),
+
+    /// Anything else
+    Other(String)
+}
+impl std::fmt::Display for GfxError
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result
+    {
+        write!(f, "{:?}", self)
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub enum GlError
@@ -53,41 +106,25 @@ impl std::fmt::Display for GlError
         write!(f, "{:?}", self)
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct GlErrors(std::vec::Vec<GlError>);
-impl std::fmt::Display for GlErrors
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result
-    {
-        for error in &self.0
-        {
-            write!(f, "{}, ", error)?
-        }
-        Ok(())
-    }
-}
-
-pub fn gl_get_errors(context: &Context) -> GlErrors
+pub fn gl_get_errors(context: &Context) -> GfxError
 {
     let mut error: GlError = context.get_error().into();
     if error != GlError::NoError
     {
-        let mut errors = GlErrors(vec![]);
+        let errors = vec![];
 
         while error != GlError::NoError
         {
-            errors.0.push(error);
+            errors.push(error);
             error = context.get_error().into();
         }
-        errors
+        GfxError::GlErrors(errors)
     }
     else
     {
-        GlErrors(vec![GlError::NoError])
+        GfxError::GlErrors(vec![GlError::NoError])
     }
 }
-use std::rc::Rc;
 
 pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Rc<Context>, &'static str>
 {
@@ -102,12 +139,11 @@ pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Rc<Context>, &
     }
 }
 
-use std::sync::{Arc, RwLock};
-use crate::gfx::gl_object::GLObject;
+
 
 lazy_static!
 {
-    static ref GL_OBJECT_RELOADER: RwLock<Vec<Arc<RwLock<dyn GLObject<ReloadError=String> + Send + Sync>>>> = RwLock::new(vec![]);
+    static ref GL_OBJECT_RELOADER: RwLock<Vec<Arc<RwLock<dyn GLObject + Send + Sync>>>> = RwLock::new(vec![]);
 }
 pub fn reload_gl_objects(context: &Rc<Context>) -> Result<(), String>
 {
@@ -118,16 +154,16 @@ pub fn reload_gl_objects(context: &Rc<Context>) -> Result<(), String>
     Ok(())
 }
 
-pub use gen_vec::{Index, closed::ClosedGenVec};
-pub struct GlManager<'a>
+pub type ManagedGlItem = Arc<RwLock<Box<dyn GLObject + 'static>>>;
+pub struct GlManager
 {
     context: Rc<Context>,
-    gl_objects: ClosedGenVec<Box<dyn GLObject<ReloadError=String> + 'a>>
+    gl_objects: ClosedGenVec<ManagedGlItem>
 }
 
-impl GlManager<'_>
+impl GlManager
 {
-    pub fn new<'a>(context: &Rc<Context>) -> Arc<RwLock<GlManager<'a>>>
+    pub fn new(context: &Rc<Context>) -> Arc<RwLock<GlManager>>
     {
         Arc::new(RwLock::new(GlManager
         {
@@ -135,12 +171,25 @@ impl GlManager<'_>
             gl_objects: ClosedGenVec::new()
         }))
     }
-}
+    pub fn context(&self) -> &Rc<Context> { &self.context }
 
-type SafeGlManager<'a> = Arc<RwLock<GlManager<'a>>>;
-fn add_to_gl_manager<'a, T>(manager: &SafeGlManager, gl_object: T) -> Result<Index, String> where T: GLObject<ReloadError=String> + 'a
-{
-    Ok(manager.write().or_else(|e| Err(e.to_string()))?.gl_objects.insert(Box::new(gl_object)))
+    pub fn add_gl_object<T>(&mut self, gl_object: T) -> (Index, ManagedGlItem) where T: GLObject + 'static
+    {
+        let item: ManagedGlItem = Arc::new(RwLock::new(Box::new(gl_object)));
+        (self.gl_objects.insert(item.clone()), item.clone())
+    }
+
+    pub fn remove_gl_object(&mut self, handle: Index)
+    {
+        //self.gl_objects.remove(handle)
+        unimplemented!()
+    }
+
+    //pub fn get_gl_object(index: Index) -> Option<&dyn GLObject>
+
+    // store all stuff in Arc<RwLock
+    // get() returns unwrapped arc.read
+    // get_mut() returns unwrapped arc.write
 }
 
 pub mod transform;

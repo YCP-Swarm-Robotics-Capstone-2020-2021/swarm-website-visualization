@@ -9,6 +9,5 @@ pub trait GLObject: Drop
     fn unbind(&self);
     /// Called if a WebGL context is lost,
     /// must re-initialize itself and reload all relevant states and data
-    type ReloadError;
-    fn reload(&mut self, context: &std::rc::Rc<crate::Context>) -> Result<(), Self::ReloadError>;
+    fn reload(&mut self, context: &std::rc::Rc<crate::Context>) -> Result<(), crate::gfx::GfxError>;
 }

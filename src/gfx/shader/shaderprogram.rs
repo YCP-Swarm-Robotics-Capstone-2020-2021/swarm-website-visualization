@@ -1,52 +1,25 @@
-use crate::gfx::
-{
-    Context,
-    gl_get_errors,
-    gl_object::GLObject,
-    buffer::Buffer,
-    GlManager,
-    add_to_gl_manager,
-};
 use std::
 {
-    sync::{Once, Arc, RwLock},
+    sync::Once,
     rc::Rc,
     collections::HashMap
 };
 use web_sys::{WebGlProgram, WebGlShader};
 use twox_hash::XxHash32;
 use gen_vec::{Index, closed::ClosedGenVec};
-use crate::gfx::shader::shaderprogram::ShaderType::UnknownShader;
-
-#[derive(Debug, Clone)]
-pub enum ShaderError
+use crate::gfx::
 {
-    /// All shader `src` parameters are `None`
-    NoShaderSource(String),
-    /// Error creating a new `WebGlProgram`
-    ProgramCreationError(String),
-    /// Error creating a new shader fragment
-    ShaderCreationError(ShaderType, String),
-    /// Error compiling shader fragment
-    ShaderCompilationError(ShaderType, String),
-    /// Error linking shader fragments to shader program
-    ProgramLinkingError(String),
-    /// Invalid `Index` handle to a `UniformBuffer`
-    InvalidUniformBufferHandle,
-    InvalidUniformBlockName,
+    Context,
+    GfxError,
+    GlManager,
+    ManagedGlItem,
+    gl_get_errors,
+    gl_object::GLObject,
+    buffer::Buffer,
+};
 
-    /// Error from a non-shader item
-    Other(String)
-}
-impl std::fmt::Display for ShaderError
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result
-    {
-        write!(f, "{:?}", self)
-    }
-}
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub enum ShaderType
 {
     VertexShader,
@@ -69,7 +42,7 @@ impl From<u32> for ShaderType
         {
             Context::VERTEX_SHADER => ShaderType::VertexShader,
             Context::FRAGMENT_SHADER => ShaderType::FragmentShader,
-            _ => UnknownShader
+            _ => ShaderType::UnknownShader
         }
     }
 }
@@ -121,9 +94,9 @@ macro_rules! buffer_fn
     {
         $(
             #[allow(dead_code)]
-            pub fn [<buffer_ $block _uniform_data_ $type>](&mut self, handle: Index, data: &[$type]) -> Result<(), ShaderError>
+            pub fn [<buffer_ $block _uniform_data_ $type>](&mut self, handle: Index, data: &[$type]) -> Result<(), GfxError>
             {
-                let mut uniform_buffer = self.uniform_buffers.get_mut(handle).ok_or(ShaderError::InvalidUniformBufferHandle)?;
+                let mut uniform_buffer = self.uniform_buffers.get_mut(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?;
                 uniform_buffer.buffer.[<buffer_sub_data_ $type>](uniform_buffer.[<$block _offset>], &data);
                 Ok(())
             }
@@ -137,7 +110,7 @@ macro_rules! add_uniform_block_fn
     {paste::paste!
     {
         $(
-            pub fn [<add_ $block _uniform_block>](&mut self, handle: Index, block_name: &str) -> Result<(), ShaderError>
+            pub fn [<add_ $block _uniform_block>](&mut self, handle: Index, block_name: &str) -> Result<(), GfxError>
             {
                 self.binding_counter += 1;
                 let binding = self.binding_counter;
@@ -145,12 +118,12 @@ macro_rules! add_uniform_block_fn
                 let index = self.context.get_uniform_block_index(&self.internal, block_name);
                 if(index == Context::INVALID_INDEX)
                 {
-                    Err(ShaderError::InvalidUniformBlockName)
+                    Err(GfxError::InvalidUniformBlockName(String::from(block_name)))
                 }
                 else
                 {
                     self.context.uniform_block_binding(&self.internal, index, binding);
-                    let uniform_buffer = self.uniform_buffers.get_mut(handle).ok_or(ShaderError::InvalidUniformBufferHandle)?;
+                    let uniform_buffer = self.uniform_buffers.get_mut(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?;
                     uniform_buffer.buffer.bind_range(binding, uniform_buffer.[<$block _offset>], uniform_buffer.[<$block _size>]);
                     uniform_buffer.[<$block _binding>] = binding;
                     Ok(())
@@ -179,11 +152,10 @@ impl GLObject for UniformBuffer
 {
     fn bind(&self) { self.buffer.bind(); }
     fn unbind(&self) { self.buffer.unbind(); }
-    type ReloadError = ShaderError;
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), Self::ReloadError>
+    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
         self.context = Rc::clone(&context);
-        self.buffer.reload(&context).or_else(|e| Err(ShaderError::Other(e)))
+        self.buffer.reload(&context)
     }
 }
 
@@ -192,47 +164,47 @@ impl Drop for UniformBuffer
     fn drop(&mut self) {}
 }
 
-pub struct ShaderProgram<'a>
+pub struct ShaderProgram
 {
     internal: WebGlProgram,
     context: Rc<Context>,
     binding_counter: u32,
 
-    vert_src: Option<&'a str>,
-    frag_src: Option<&'a str>,
+    vert_src: Option<String>,
+    frag_src: Option<String>,
     uniform_block_bindings: HashMap<u32, String, std::hash::BuildHasherDefault<XxHash32>>,
     uniform_buffers: ClosedGenVec<UniformBuffer>
 }
 
-impl<'a> ShaderProgram<'a>
+impl ShaderProgram
 {
-    fn new_program(context: &Context) -> Result<WebGlProgram, ShaderError>
+    fn new_program(context: &Context) -> Result<WebGlProgram, GfxError>
     {
-        context.create_program().ok_or_else(|| ShaderError::ProgramCreationError(gl_get_errors(&context).to_string()))
+        context.create_program().ok_or_else(|| GfxError::ShaderProgramCreationError(gl_get_errors(&context).to_string()))
     }
 
-    pub fn new(context: &Rc<Context>, vert_src: Option<&'a str>, frag_src: Option<&'a str>) -> Result<ShaderProgram<'a>, ShaderError>
+    pub fn new(manager: &mut GlManager, vert_src: Option<String>, frag_src: Option<String>) -> Result<(Index, ManagedGlItem), GfxError>
     {
         if vert_src.is_none() && frag_src.is_none()
         {
-            return Err(ShaderError::NoShaderSource("At least one shader source must be present".to_string()))
+            return Err(GfxError::NoShaderSource("At least one shader source must be present".to_string()))
         }
         let program = ShaderProgram
         {
-            internal: ShaderProgram::new_program(&context)?,
-            context: Rc::clone(context),
+            internal: ShaderProgram::new_program(&manager.context())?,
+            context: Rc::clone(&manager.context()),
             binding_counter: 0,
-            vert_src: vert_src.clone(),
-            frag_src: frag_src.clone(),
+            vert_src: vert_src,
+            frag_src: frag_src,
             uniform_block_bindings: Default::default(),
             uniform_buffers: ClosedGenVec::new()
         };
-        program.compile(vert_src, frag_src)?;
-        Ok(program)
+        program.compile(&program.vert_src, &program.frag_src)?;
+        Ok(manager.add_gl_object(program))
     }
 
     /// Compiles the shader fragments and attaches them to the shader program
-    fn compile(&self, vert_src: Option<&str>, frag_src: Option<&str>) -> Result<(), ShaderError>
+    fn compile(&self, vert_src: &Option<String>, frag_src: &Option<String>) -> Result<(), GfxError>
     {
 
         let vert = if let Some(src) = vert_src
@@ -255,16 +227,18 @@ impl<'a> ShaderProgram<'a>
         }
         else
         {
-            Err(ShaderError::ProgramLinkingError(self.context.get_program_info_log(&self.internal).unwrap_or_else(|| "Unknown error linking shader".to_string())))
+            let info_log = self.context.get_program_info_log(&self.internal)
+                .unwrap_or_else(|| format!("Error getting shader program info logs after linking. GlErrors: {}", gl_get_errors(&self.context)).to_string());
+            Err(GfxError::ShaderProgramLinkingError(info_log))
         }
     }
 
     /// Compiles a shader fragment
-    fn compile_shader(&self, src: &str, shader_type: ShaderType) -> Result<WebGlShader, ShaderError>
+    fn compile_shader(&self, src: &String, shader_type: ShaderType) -> Result<WebGlShader, GfxError>
     {
         let shader = self.context.create_shader(shader_type.into())
-            .ok_or(ShaderError::ShaderCreationError(shader_type, gl_get_errors(&self.context).to_string()))?;
-        self.context.shader_source(&shader, &src);
+            .ok_or(GfxError::ShaderCreationError(shader_type, gl_get_errors(&self.context).to_string()))?;
+        self.context.shader_source(&shader, &src.as_str());
         self.context.compile_shader(&shader);
         self.context.attach_shader(&self.internal, &shader);
 
@@ -274,15 +248,16 @@ impl<'a> ShaderProgram<'a>
         }
         else
         {
-            Err(ShaderError::ShaderCompilationError(shader_type,
-                                       self.context.get_shader_info_log(&shader).unwrap_or_else(|| "Unknown (error while getting the error :/ )".to_string())))
+            let info_log = self.context.get_shader_info_log(&shader)
+                .unwrap_or_else(|| format!("Error getting shader compilation info log. GlErrors: {}", gl_get_errors(&self.context)).to_string());
+            Err(GfxError::ShaderCompilationError(shader_type, info_log))
         }
     }
 
-    pub fn new_uniform_buffer(&mut self, context: &Rc<Context>, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<Index, String>
+    pub fn new_uniform_buffer(&mut self, manager: &mut GlManager, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<(Index, ManagedGlItem), GfxError>
     {
-        let vert_size = align(&context, vert_size);
-        let frag_size = align(&context, frag_size);
+        let vert_size = align(&manager.context(), vert_size);
+        let frag_size = align(&manager.context(), frag_size);
 
         let index = self.uniform_buffers.insert(
             UniformBuffer
@@ -290,10 +265,13 @@ impl<'a> ShaderProgram<'a>
                     buffer:
                     {
                         // Create a new buffer and fill it with empty data to size it
-                        let mut buffer = Buffer::new(&context, Context::UNIFORM_BUFFER)?;
-                        buffer.bind();
-                        buffer.buffer_data_f32(&vec![0f32; (vert_size + frag_size) as usize], draw_type);
-                        buffer
+                        let (handle, buffer) = manager.add_gl_object(Buffer::new(&context, Context::UNIFORM_BUFFER)?);
+                        {
+                            let mut buffer = buffer.write().unwrap();
+                            buffer.bind();
+                            buffer.buffer_data_f32(&vec![0f32; (vert_size + frag_size) as usize], draw_type);
+                        }
+                        item
                     },
                     context: Rc::clone(context),
                     vert_size,
@@ -322,22 +300,22 @@ impl<'a> ShaderProgram<'a>
         self.uniform_buffers.get_mut(handle)
     }
 
-    pub fn delete_uniform_buffer(&mut self, handle: Index) -> Result<(), ShaderError>
+    pub fn delete_uniform_buffer(&mut self, handle: Index) -> Result<(), GfxError>
     {
-        self.uniform_buffers.remove(handle).ok_or(ShaderError::InvalidUniformBufferHandle)?;
+        self.uniform_buffers.remove(handle).ok_or(GfxError::InvalidHandle)?;
         Ok(())
     }
 
-    pub fn bind_uniform_buffer(&self, handle: Index) -> Result<(), ShaderError>
+    pub fn bind_uniform_buffer(&self, handle: Index) -> Result<(), GfxError>
     {
-        self.get_uniform_buffer(handle).ok_or(ShaderError::InvalidUniformBufferHandle)?.bind();
+        self.get_uniform_buffer(handle).ok_or(GfxError::InvalidHandle)?.bind();
         Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn unbind_uniform_buffer(&self, handle: Index) -> Result<(), ShaderError>
+    pub fn unbind_uniform_buffer(&self, handle: Index) -> Result<(), GfxError>
     {
-        self.get_uniform_buffer(handle).ok_or(ShaderError::InvalidUniformBufferHandle)?.unbind();
+        self.get_uniform_buffer(handle).ok_or(GfxError::InvalidHandle)?.unbind();
         Ok(())
     }
 
@@ -348,12 +326,11 @@ impl<'a> ShaderProgram<'a>
     buffer_fn!(u32, vert, frag);
 }
 
-impl GLObject for ShaderProgram<'_>
+impl GLObject for ShaderProgram
 {
     fn bind(&self) { self.context.use_program(Some(&self.internal)); }
     fn unbind(&self) { self.context.use_program(None); }
-    type ReloadError = ShaderError;
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), Self::ReloadError>
+    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
         self.context = Rc::clone(context);
         self.internal = ShaderProgram::new_program(&self.context)?;
@@ -366,7 +343,7 @@ impl GLObject for ShaderProgram<'_>
     }
 }
 
-impl Drop for ShaderProgram<'_>
+impl Drop for ShaderProgram
 {
     fn drop(&mut self)
     {
