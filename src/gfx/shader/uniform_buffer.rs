@@ -90,16 +90,33 @@ impl UniformBuffer
         })
     }
 
+    /// Set `data` as the contents of the vertex shader uniform block
     pub fn buffer_vert_data<T>(&mut self, data: &[T])
     {
         self.buffer.buffer_sub_data(self.vert_offset, &data);
     }
 
+    /// Set `data` as the contents of the vertex shader uniform block, starting at `offset`
+    #[allow(dead_code)]
+    pub fn buffer_vert_data_with_offset<T>(&mut self, offset: i32, data: &[T])
+    {
+        self.buffer.buffer_sub_data(self.vert_offset+offset, &data)
+    }
+
+    /// Set `data` as the contents of the fragment shader uniform block
     pub fn buffer_frag_data<T>(&mut self, data: &[T])
     {
         self.buffer.buffer_sub_data(self.frag_offset, &data);
     }
 
+    /// Set `data` as the contents of the fragment shader uniform block, starting at `offset`
+    #[allow(dead_code)]
+    pub fn buffer_frag_data_with_offset<T>(&mut self, offset: i32, data: &[T])
+    {
+        self.buffer.buffer_sub_data(self.frag_offset+offset, &data);
+    }
+
+    /// Register a vertex shader uniform block of `block_name` from within `shader_program` to this uniform buffer
     pub fn add_vert_block(&mut self, shader_program: &mut ShaderProgram, block_name: &str) -> Result<(), GfxError>
     {
         if self.vert_binding == None
@@ -112,6 +129,7 @@ impl UniformBuffer
         Ok(())
     }
 
+    /// Register a fragment shader uniform block of `block_name` from within `shader_program` to this uniform buffer
     pub fn add_frag_block(&mut self, shader_program: &mut ShaderProgram, block_name: &str) -> Result<(), GfxError>
     {
         if self.frag_binding == None
@@ -129,9 +147,13 @@ impl GlObject for UniformBuffer
 {
     fn bind(&self) { self.buffer.bind(); }
     fn unbind(&self) { self.buffer.unbind(); }
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
+    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
-        self.buffer.reload(&context)
+        self.buffer.recreate(&context)
+    }
+    fn reload(&mut self) -> Result<(), GfxError>
+    {
+        self.buffer.reload()
     }
 }
 

@@ -52,11 +52,15 @@ impl Buffer
         })
     }
 
+    /// Set the contents of the buffer to `data`
+    /// `draw_type` is one of the webgl `*_DRAW` enum types
     pub fn buffer_data<T>(&mut self, data: &[T], draw_type: u32)
     {
         self.buffer_data_raw(as_u8_slice(data), draw_type);
     }
 
+    /// Set the contents of the buffer to `data`
+    /// `draw_type` is one of the webgl `*_DRAW` enum types
     pub fn buffer_data_raw(&mut self, data: &[u8], draw_type: u32)
     {
         self.buffer = data.to_vec();
@@ -64,11 +68,15 @@ impl Buffer
         self.draw_type = draw_type;
     }
 
+    /// Set the contents of the buffer to `data`, starting at `offset`
+    /// `draw_type` is one of the webgl `*_DRAW` enum types
     pub fn buffer_sub_data<T>(&mut self, offset: i32, data: &[T])
     {
         self.buffer_sub_data_raw(offset, as_u8_slice(data));
     }
 
+    /// Set the contents of the buffer to `data`, starting at `offset`
+    /// `draw_type` is one of the webgl `*_DRAW` enum types
     pub fn buffer_sub_data_raw(&mut self, offset: i32, data: &[u8])
     {
         self.context.buffer_sub_data_with_i32_and_u8_array(self.buffer_type, offset, data);
@@ -98,10 +106,14 @@ impl GlObject for Buffer
     {
         self.context.bind_buffer(self.buffer_type, None);
     }
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
+    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
         self.context = Rc::clone(&context);
         self.internal = Buffer::new_buffer(&self.context)?;
+        Ok(())
+    }
+    fn reload(&mut self) -> Result<(), GfxError>
+    {
         self.bind();
         self.context.buffer_data_with_u8_array(self.buffer_type, &self.buffer, self.draw_type);
 

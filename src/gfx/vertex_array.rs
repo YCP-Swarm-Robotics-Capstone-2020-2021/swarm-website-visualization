@@ -67,6 +67,7 @@ impl VertexArray
         context.create_vertex_array().ok_or_else(|| GfxError::VertexArrayCreationError(gl_get_errors(context).to_string()))
     }
 
+    /// Creates a new vertex array
     pub fn new(context: &Rc<Context>) -> Result<VertexArray, GfxError>
     {
         Ok(VertexArray
@@ -79,6 +80,7 @@ impl VertexArray
         })
     }
 
+    /// Add a `Buffer` to this `VertexArray` with the given `AttribPointer`s, if any
     pub fn add_buffer(&mut self, buffer: Buffer, attrib_ptrs: Option<Vec<AttribPointer>>) -> Index
     {
         buffer.bind();
@@ -100,6 +102,25 @@ impl VertexArray
             self.context.enable_vertex_attrib_array(ptr.index);
         }
     }
+
+    #[allow(dead_code)]
+    pub fn get_buffer(&self, handle: Index) -> Result<&Buffer, GfxError>
+    {
+        self.buffers.get(handle).ok_or_else(|| GfxError::InvalidHandle(handle))
+    }
+
+    #[allow(dead_code)]
+    pub fn get_buffer_mut(&mut self, handle: Index) -> Result<&mut Buffer, GfxError>
+    {
+        self.buffers.get_mut(handle).ok_or_else(|| GfxError::InvalidHandle(handle))
+    }
+
+    #[allow(dead_code)]
+    pub fn remove_buffer(&mut self, handle: Index) -> Result<Buffer, GfxError>
+    {
+        self.attrib_ptrs.remove(handle);
+        self.buffers.remove(handle).ok_or_else(|| GfxError::InvalidHandle(handle))
+    }
 }
 
 impl GlObject for VertexArray
@@ -112,19 +133,20 @@ impl GlObject for VertexArray
     {
         self.context.bind_vertex_array(None);
     }
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
+    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
         self.context = Rc::clone(&context);
         self.internal = VertexArray::new_vertex_array(&self.context)?;
+        Ok(())
+    }
+    fn reload(&mut self) -> Result<(), GfxError>
+    {
         self.bind();
 
-        for (_, buffer) in &mut self.buffers
+        for index in self.allocator.iter()
         {
-            buffer.reload(&self.context)?;
-        }
-        for (_, attrib_ptrs) in &self.attrib_ptrs
-        {
-            if let Some(attrib_ptrs) = &attrib_ptrs
+            self.buffers.get_mut(index).ok_or_else(|| GfxError::InvalidHandle(index))?.recreate_and_reload(&self.context)?;
+            if let Some(attrib_ptrs) = self.attrib_ptrs.get(index).ok_or_else(|| GfxError::InvalidHandle(index))?
             {
                 self.set_attrib_ptrs(&attrib_ptrs);
             }

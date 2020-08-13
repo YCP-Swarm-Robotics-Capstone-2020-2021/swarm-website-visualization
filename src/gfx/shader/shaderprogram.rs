@@ -135,6 +135,7 @@ impl ShaderProgram
         }
     }
 
+    /// Binds the uniform block `block_name` to the given `block_binding`
     pub fn add_uniform_block_binding(&mut self, block_name: &str, block_binding: u32) -> Result<(), GfxError>
     {
         let index = self.context.get_uniform_block_index(&self.internal, block_name);
@@ -160,11 +161,15 @@ impl GlObject for ShaderProgram
 {
     fn bind(&self) { self.context.use_program(Some(&self.internal)); }
     fn unbind(&self) { self.context.use_program(None); }
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
+    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
-        self.context = Rc::clone(context);
+        self.context = Rc::clone(&context);
         self.internal = ShaderProgram::new_program(&self.context)?;
         self.compile()?;
+        Ok(())
+    }
+    fn reload(&mut self) -> Result<(), GfxError>
+    {
         self.bind();
 
         for (block_binding, block_name) in self.block_bindings.to_owned().iter().enumerate()

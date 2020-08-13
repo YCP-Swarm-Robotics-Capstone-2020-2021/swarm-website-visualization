@@ -149,9 +149,9 @@ pub fn main() -> Result<(), JsValue>
             {
                 //let canvas = canvas_clone;
                 let context = new_context(&canvas_clone).unwrap();
-                shaderprog.reload(&context).expect("shader program reloaded");
-                uniform_buffer.reload(&context).expect("uniform buffer reloaded");
-                va.reload(&context).expect("vertex array reloaded");
+                shaderprog.recreate_and_reload(&context).expect("shader program reloaded");
+                uniform_buffer.recreate_and_reload(&context).expect("uniform buffer reloaded");
+                va.recreate_and_reload(&context).expect("vertex array reloaded");
 
                 context.clear_color(0.0, 0.0, 0.0, 1.0);
                 context.clear(Context::COLOR_BUFFER_BIT);
