@@ -1,20 +1,24 @@
+use crate::gfx::
+{
+    Context,
+    GfxError,
+    gl_object::GlObject,
+    buffer::Buffer,
+    shader::shaderprogram::ShaderProgram,
+};
 use std::
 {
     sync::
     {
         Once,
-        atomic::{AtomicU32, Ordering},
+        atomic::
+        {
+            AtomicU32,
+            Ordering,
+        }
     },
-    rc::Rc
+    rc::Rc,
 };
-use crate::gfx::
-{
-    Context,
-    gl_object::GLObject,
-    buffer::Buffer,
-    shader::shaderprogram::ShaderProgram
-};
-
 // THIS VARIABLE MUST NEVER BE CHANGED OUTSIDE OF `get_alignment`
 // Using it in this way to cache the uniform buffer alignment is thread-safe as long
 // as it is only changed once with INIT.call_once();
@@ -22,7 +26,7 @@ static mut ALIGNMENT: i32 = 0;
 static INIT: Once = Once::new();
 
 /// Get the uniform buffer offset alignment of the GPU
-fn get_alignment(context: &Rc<Context>) -> i32
+fn get_alignment(context: &Context) -> i32
 {
     unsafe
         {
@@ -36,35 +40,17 @@ fn get_alignment(context: &Rc<Context>) -> i32
 }
 
 /// Align `size` to the `UNIFORM_BUFFER_OFFSET_ALIGNMENT`
-fn align(context: &Rc<Context>, size: i32) -> i32
+fn align(context: &Context, size: i32) -> i32
 {
     (size + get_alignment(&context) - 1) & (-get_alignment(&context))
 }
 
-// Atomic counter for creating new block bindings
-static BLOCK_BINDING: AtomicU32 = AtomicU32::new(1);
-
-/// Macro to implement buffer_<block>_data_<type> functions for each block and primitive type
-/// i.e. buffer_vert_data_f32
-macro_rules! buffer_fn
-{
-    ($type:ty, $($block:tt),+) =>
-    {paste::paste!
-    {
-        $(
-            #[allow(dead_code)]
-            pub fn [<buffer_ $block _data_ $type>](&self, data: &[$type])
-            {
-                self.buffer.[<buffer_sub_data_ $type>](self.[<$block _offset>], &data);
-            }
-        )+
-    }}
-}
+/// Atomic counter for generating new uniform block bindings
+static BLOCK_BINDINGS: AtomicU32 = AtomicU32::new(0);
 
 pub struct UniformBuffer
 {
     buffer: Buffer,
-    //context: Rc<Context>,
 
     vert_size: i32,
     frag_size: i32,
@@ -72,89 +58,106 @@ pub struct UniformBuffer
     vert_offset: i32,
     frag_offset: i32,
 
-    vert_binding: u32,
-    frag_binding: u32
+    vert_binding: Option<u32>,
+    frag_binding: Option<u32>
 }
 
 impl UniformBuffer
 {
-    pub fn new(context: &Rc<Context>, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<UniformBuffer, String>
+    pub fn new(context: &Rc<Context>, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<UniformBuffer, GfxError>
     {
         let vert_size = align(&context, vert_size);
-        let frag_size = align(&context, frag_size);
+        // not necessary to align frag size since it isn't used as an offset
+        //let frag_size = align(&context, frag_size);
 
         Ok(UniformBuffer
         {
             buffer:
-                {
-                    // Create a new buffer and fill it with empty data to size it
-                    let buffer = Buffer::new(&context, Context::UNIFORM_BUFFER)?;
-                    buffer.bind();
-                    buffer.buffer_data_f32(&vec![0f32; (vert_size + frag_size) as usize], draw_type);
-                    buffer
-                },
-            //context: Rc::clone(context),
+            {
+                let mut buffer = Buffer::new(&context, Context::UNIFORM_BUFFER)?;
+                buffer.bind();
+                buffer.buffer_data_raw(&vec![0u8; (vert_size + frag_size) as usize], draw_type);
+                buffer
+            },
             vert_size,
             frag_size,
 
             vert_offset: 0,
             frag_offset: vert_size,
 
-            vert_binding: 0,
-            frag_binding: 0
+            vert_binding: None,
+            frag_binding: None
         })
     }
 
-    /// Internal buffer
-    pub fn buffer(&self) -> &Buffer
+    /// Set `data` as the contents of the vertex shader uniform block
+    pub fn buffer_vert_data<T>(&mut self, data: &[T])
     {
-        &self.buffer
+        self.buffer.buffer_sub_data(self.vert_offset, &data);
     }
 
-    /// Add a uniform block from the shader to this uniform buffer
-    fn add_uniform_block(buffer: &Buffer, shader_program: &ShaderProgram, block_name: &str, offset: i32, size: i32) -> u32
+    /// Set `data` as the contents of the vertex shader uniform block, starting at `offset`
+    #[allow(dead_code)]
+    pub fn buffer_vert_data_with_offset<T>(&mut self, offset: i32, data: &[T])
     {
-        let binding = BLOCK_BINDING.fetch_add(1, Ordering::Relaxed);
-        shader_program.add_uniform_block_binding(block_name, binding);
-        buffer.bind_range(binding, offset, size);
-        binding
+        self.buffer.buffer_sub_data(self.vert_offset+offset, &data)
     }
 
-    /// Add a uniform block from the vertex shader to this uniform buffer
-    pub fn add_vert_block(&mut self, shader_program: &ShaderProgram, block_name: &str)
+    /// Set `data` as the contents of the fragment shader uniform block
+    pub fn buffer_frag_data<T>(&mut self, data: &[T])
     {
-        self.vert_binding = UniformBuffer::add_uniform_block(&self.buffer(), &shader_program, &block_name, self.vert_offset, self.vert_size);
+        self.buffer.buffer_sub_data(self.frag_offset, &data);
     }
 
-    /// Add a uniform block from the fragment shader to this uniform buffer
-    pub fn add_frag_block(&mut self, shader_program: &ShaderProgram, block_name: &str)
+    /// Set `data` as the contents of the fragment shader uniform block, starting at `offset`
+    #[allow(dead_code)]
+    pub fn buffer_frag_data_with_offset<T>(&mut self, offset: i32, data: &[T])
     {
-        self.frag_binding = UniformBuffer::add_uniform_block(&self.buffer, &shader_program, &block_name, self.frag_offset, self.frag_size);
+        self.buffer.buffer_sub_data(self.frag_offset+offset, &data);
     }
 
-    buffer_fn!(f32, vert, frag);
-    buffer_fn!(i32, vert, frag);
-    buffer_fn!(u32, vert, frag);
+    /// Register a vertex shader uniform block of `block_name` from within `shader_program` to this uniform buffer
+    pub fn add_vert_block(&mut self, shader_program: &mut ShaderProgram, block_name: &str) -> Result<(), GfxError>
+    {
+        if self.vert_binding == None
+        {
+            self.vert_binding = Some(BLOCK_BINDINGS.fetch_add(1, Ordering::Relaxed));
+        }
+        shader_program.add_uniform_block_binding(block_name, self.vert_binding.unwrap())?;
+        self.buffer.bind();
+        self.buffer.bind_range(self.vert_binding.unwrap(), self.vert_offset, self.vert_size);
+        Ok(())
+    }
 
+    /// Register a fragment shader uniform block of `block_name` from within `shader_program` to this uniform buffer
+    pub fn add_frag_block(&mut self, shader_program: &mut ShaderProgram, block_name: &str) -> Result<(), GfxError>
+    {
+        if self.frag_binding == None
+        {
+            self.frag_binding = Some(BLOCK_BINDINGS.fetch_add(1, Ordering::Relaxed));
+        }
+        shader_program.add_uniform_block_binding(block_name, self.frag_binding.unwrap())?;
+        self.buffer.bind();
+        self.buffer.bind_range(self.frag_binding.unwrap(), self.frag_offset, self.frag_size);
+        Ok(())
+    }
 }
 
-impl GLObject for UniformBuffer
+impl GlObject for UniformBuffer
 {
-    fn bind(&self)
+    fn bind(&self) { self.buffer.bind(); }
+    fn unbind(&self) { self.buffer.unbind(); }
+    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
     {
-        self.buffer.bind();
+        self.buffer.recreate(&context)
     }
-
-    fn unbind(&self)
+    fn reload(&mut self) -> Result<(), GfxError>
     {
-        self.buffer.unbind();
+        self.buffer.reload()
     }
 }
 
 impl Drop for UniformBuffer
 {
-    fn drop(&mut self)
-    {
-
-    }
+    fn drop(&mut self) {}
 }
