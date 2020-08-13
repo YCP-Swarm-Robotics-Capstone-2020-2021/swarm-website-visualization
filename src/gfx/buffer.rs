@@ -1,28 +1,15 @@
 use std::rc::Rc;
 use web_sys::{WebGlBuffer};
 use paste::paste;
-use gen_vec::Index;
 use crate::gfx::
 {
     Context,
-    GlManager,
     GfxError,
     gl_get_errors,
-    gl_object::GLObject,
+    gl_object::GlObject,
 };
 use crate::gfx::GfxError::BufferCreationError;
 
-/// A single item in the buffer
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
-enum BufferContents
-{
-    #[allow(non_camel_case_types)]
-    f32(f32),
-    #[allow(non_camel_case_types)]
-    i32(i32),
-    #[allow(non_camel_case_types)]
-    u32(u32)
-}
 #[derive(Debug, Copy, Clone)]
 struct RangeBinding(u32, i32, i32);
 
@@ -32,69 +19,64 @@ pub struct Buffer
     context: Rc<Context>,
     buffer_type: u32,
     draw_type: u32,
-    buffer: Vec<BufferContents>,
+    buffer: Vec<u8>,
     range_bindings: Vec<Option<RangeBinding>>
 }
 
-/// Creates `buffer_data_$type` and `buffer_sub_data_$type` functions
-/// `$type` is the primitive type associated with `$js_array`
-/// i.e. f32 for Float32Array
-/// @conv Convert a buffer of `$type` into a buffer of BufferContents
-macro_rules! buffer_fn
+fn as_u8_slice<T>(data: &[T]) -> &[u8]
 {
-    (@conv $type:ident, $data:ident) => {{ $data.iter().map(|i| BufferContents::$type(*i)).collect::<Vec<BufferContents>>() }};
-    ($type:ty, $js_array:path) =>
-    {paste!
-    {
-        #[allow(dead_code)]
-        pub fn [<buffer_data_ $type>](&mut self, data: &[$type], draw_type: u32)
+    unsafe
         {
-            unsafe
-                {
-                    let buff = $js_array::view(&data);
-                    self.context.buffer_data_with_array_buffer_view(self.buffer_type, &buff, draw_type);
-                }
-            self.draw_type = draw_type;
-            self.buffer = buffer_fn!(@conv $type, data);
+            std::slice::from_raw_parts(
+                data.as_ptr() as *const u8,
+                data.len() * std::mem::size_of::<T>()
+            )
         }
-
-        #[allow(dead_code)]
-        pub fn [<buffer_sub_data_ $type>](&mut self, offset: i32, data: &[$type])
-        {
-            unsafe
-                {
-                    let buff = $js_array::view(&data);
-                    self.context.buffer_sub_data_with_i32_and_array_buffer_view(self.buffer_type, offset, &buff);
-                }
-            self.buffer.splice(offset as usize..offset as usize+data.len()-1, buffer_fn!(@conv $type, data));
-        }
-    }}
 }
 
 impl Buffer
 {
     fn new_buffer(context: &Context) -> Result<WebGlBuffer, GfxError>
     {
-        context.create_buffer().ok_or_else(|| GfxError::BufferCreationError(gl_get_errors(context)))
+        context.create_buffer().ok_or_else(|| GfxError::BufferCreationError(gl_get_errors(context).to_string()))
     }
 
-    pub fn new(manager: &GlManager, buffer_type: u32) -> Result<Index, GfxError>
+    pub fn new(context: &Rc<Context>, buffer_type: u32) -> Result<Buffer, GfxError>
     {
-        let buffer = Buffer
+        Ok(Buffer
         {
-            internal: Buffer::new_buffer(&manager.context())?,
-            context: Rc::clone(&manager.context()),
+            internal: Buffer::new_buffer(&context)?,
+            context: Rc::clone(&context),
             buffer_type,
             draw_type: 0,
             buffer: vec![],
             range_bindings: vec![]
-        };
-        Ok(manager.add_gl_object(buffer))
+        })
     }
 
-    buffer_fn!(f32, js_sys::Float32Array);
-    buffer_fn!(i32, js_sys::Int32Array);
-    buffer_fn!(u32, js_sys::Uint32Array);
+    pub fn buffer_data<T>(&mut self, data: &[T], draw_type: u32)
+    {
+        self.buffer_data_raw(as_u8_slice(data), draw_type);
+    }
+
+    pub fn buffer_data_raw(&mut self, data: &[u8], draw_type: u32)
+    {
+        self.buffer = data.to_vec();
+        self.context.buffer_data_with_u8_array(self.buffer_type, &self.buffer, draw_type);
+        self.draw_type = draw_type;
+    }
+
+    pub fn buffer_sub_data<T>(&mut self, offset: i32, data: &[T])
+    {
+        self.buffer_sub_data_raw(offset, as_u8_slice(data));
+    }
+
+    pub fn buffer_sub_data_raw(&mut self, offset: i32, data: &[u8])
+    {
+        self.context.buffer_sub_data_with_i32_and_u8_array(self.buffer_type, offset, data);
+        self.buffer.splice(offset as usize..(offset as usize + data.len()), data.to_vec());
+        crate::log_s(format!("{}", self.buffer.len()));
+    }
 
     /// Bind `index` to the buffer memory range `offset`->`offset+size`
     pub fn bind_range(&mut self, index: u32, offset: i32, size: i32)
@@ -105,41 +87,12 @@ impl Buffer
         {
             self.range_bindings.resize_with(index as usize + 1, || None);
         }
+        crate::log(format!("{:?}", RangeBinding(index, offset, size)).as_str());
         self.range_bindings[index as usize] = Some(RangeBinding(index, offset, size));
     }
 }
 
-/// Convert a `BufferContents` vec to a vec of bytes
-macro_rules! buffer_contents_to_bytes
-{
-    (@conv $buff:expr, $conv_func:ident, $($variant:ident),+) =>
-    {{
-        let mut out_buff: Vec<u8> = Vec::with_capacity($buff.len() * std::mem::size_of::<BufferContents>());
-        for i in &$buff
-        {
-            match i
-            {
-            $(
-                BufferContents::$variant(contents) => out_buff.extend_from_slice(&contents.$conv_func()),
-            )+
-            }
-        }
-        out_buff
-    }};
-    ($buff:expr) =>
-    {{
-        if cfg!(target_endian = "big")
-        {
-            buffer_contents_to_bytes!(@conv $buff, to_be_bytes, f32, i32, u32)
-        }
-        else
-        {
-            buffer_contents_to_bytes!(@conv $buff, to_le_bytes, f32, i32, u32)
-        }
-    }}
-}
-
-impl GLObject for Buffer
+impl GlObject for Buffer
 {
     fn bind(&self)
     {
@@ -163,9 +116,7 @@ impl GLObject for Buffer
                 self.bind_range(range_binding.0, range_binding.1, range_binding.2);
             }
         }
-
-        let bytes = buffer_contents_to_bytes!(self.buffer);
-        self.context.buffer_data_with_u8_array(self.buffer_type, &bytes, self.draw_type);
+        self.context.buffer_data_with_u8_array(self.buffer_type, &self.buffer, self.draw_type);
 
         Ok(())
     }
