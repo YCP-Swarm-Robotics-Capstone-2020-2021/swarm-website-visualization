@@ -1,6 +1,5 @@
 use std::rc::Rc;
 use web_sys::{WebGlBuffer};
-use paste::paste;
 use crate::gfx::
 {
     Context,
@@ -8,7 +7,6 @@ use crate::gfx::
     gl_get_errors,
     gl_object::GlObject,
 };
-use crate::gfx::GfxError::BufferCreationError;
 
 #[derive(Debug, Copy, Clone)]
 struct RangeBinding(u32, i32, i32);
@@ -75,7 +73,6 @@ impl Buffer
     {
         self.context.buffer_sub_data_with_i32_and_u8_array(self.buffer_type, offset, data);
         self.buffer.splice(offset as usize..(offset as usize + data.len()), data.to_vec());
-        crate::log_s(format!("{}", self.buffer.len()));
     }
 
     /// Bind `index` to the buffer memory range `offset`->`offset+size`
@@ -87,7 +84,6 @@ impl Buffer
         {
             self.range_bindings.resize_with(index as usize + 1, || None);
         }
-        crate::log(format!("{:?}", RangeBinding(index, offset, size)).as_str());
         self.range_bindings[index as usize] = Some(RangeBinding(index, offset, size));
     }
 }
@@ -113,6 +109,7 @@ impl GlObject for Buffer
         {
             if let Some(range_binding) = range_binding
             {
+                crate::log(format!("{:?}", range_binding).as_str());
                 self.bind_range(range_binding.0, range_binding.1, range_binding.2);
             }
         }

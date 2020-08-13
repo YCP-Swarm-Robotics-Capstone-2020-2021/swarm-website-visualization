@@ -3,7 +3,7 @@
 /// All OpenGL object wrappers that can be bound/unbound
 /// should implement this trait
 
-pub trait GLObject: Drop
+pub trait GlObject: Drop
 {
     fn bind(&self);
     fn unbind(&self);

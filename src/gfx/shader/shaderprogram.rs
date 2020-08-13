@@ -2,19 +2,15 @@ use std::
 {
     sync::Once,
     rc::Rc,
-    collections::HashMap
 };
 use web_sys::{WebGlProgram, WebGlShader};
-use twox_hash::XxHash32;
 use gen_vec::{Index, closed::ClosedGenVec};
 use crate::gfx::
 {
     Context,
     GfxError,
-    GlManager,
-    ManagedGlItem,
     gl_get_errors,
-    gl_object::GLObject,
+    gl_object::GlObject,
     buffer::Buffer,
 };
 
@@ -74,6 +70,7 @@ fn get_alignment(context: &Context) -> i32
                 {
                     ALIGNMENT = context.get_parameter(Context::UNIFORM_BUFFER_OFFSET_ALIGNMENT)
                         .expect("Uniform Buffer Alignment").as_f64().expect("Uniform Buffer Alignment as f64") as i32;
+                    crate::log(format!("{}", ALIGNMENT).as_str());
                 });
             ALIGNMENT
         }
@@ -89,15 +86,15 @@ fn align(context: &Context, size: i32) -> i32
 /// i.e. buffer_vert_data_f32
 macro_rules! buffer_fn
 {
-    ($type:ty, $($block:tt),+) =>
+    ($($block:tt),+) =>
     {paste::paste!
     {
         $(
             #[allow(dead_code)]
-            pub fn [<buffer_ $block _uniform_data_ $type>](&mut self, handle: Index, data: &[$type]) -> Result<(), GfxError>
+            pub fn [<buffer_ $block _uniform_data>]<T>(&mut self, handle: Index, data: &[T]) -> Result<(), GfxError>
             {
-                let mut uniform_buffer = self.uniform_buffers.get_mut(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?;
-                uniform_buffer.buffer.[<buffer_sub_data_ $type>](uniform_buffer.[<$block _offset>], &data);
+                let uniform_buffer = self.uniform_buffers.get_mut(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?;
+                uniform_buffer.buffer.buffer_sub_data(uniform_buffer.[<$block _offset>], &data);
                 Ok(())
             }
         )+
@@ -112,31 +109,34 @@ macro_rules! add_uniform_block_fn
         $(
             pub fn [<add_ $block _uniform_block>](&mut self, handle: Index, block_name: &str) -> Result<(), GfxError>
             {
-                self.binding_counter += 1;
-                let binding = self.binding_counter;
-
+                let uniform_buffer = self.uniform_buffers.get_mut(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?;
                 let index = self.context.get_uniform_block_index(&self.internal, block_name);
-                if(index == Context::INVALID_INDEX)
+
+                if index == Context::INVALID_INDEX
                 {
                     Err(GfxError::InvalidUniformBlockName(String::from(block_name)))
                 }
                 else
                 {
-                    self.context.uniform_block_binding(&self.internal, index, binding);
-                    let uniform_buffer = self.uniform_buffers.get_mut(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?;
-                    uniform_buffer.buffer.bind_range(binding, uniform_buffer.[<$block _offset>], uniform_buffer.[<$block _size>]);
-                    uniform_buffer.[<$block _binding>] = binding;
+                    uniform_buffer.[<$block _binding>] = self.binding_counter;
+                    uniform_buffer.[<$block _name>] = Some(String::from(block_name));
+
+                    self.context.uniform_block_binding(&self.internal, index, uniform_buffer.[<$block _binding>]);
+
+                    uniform_buffer.buffer.bind();
+                    uniform_buffer.buffer.bind_range(uniform_buffer.[<$block _binding>], uniform_buffer.[<$block _offset>], uniform_buffer.[<$block _size>]);
+
+                    self.binding_counter += 1;
                     Ok(())
                 }
             }
         )+
-    }}
+    }};
 }
 
 pub struct UniformBuffer
 {
-    buffer: Buffer,
-    context: Rc<Context>,
+    pub buffer: Buffer,
 
     vert_size: i32,
     frag_size: i32,
@@ -144,24 +144,11 @@ pub struct UniformBuffer
     vert_offset: i32,
     frag_offset: i32,
 
+    vert_name: Option<String>,
+    frag_name: Option<String>,
+
     vert_binding: u32,
     frag_binding: u32
-}
-
-impl GLObject for UniformBuffer
-{
-    fn bind(&self) { self.buffer.bind(); }
-    fn unbind(&self) { self.buffer.unbind(); }
-    fn reload(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
-    {
-        self.context = Rc::clone(&context);
-        self.buffer.reload(&context)
-    }
-}
-
-impl Drop for UniformBuffer
-{
-    fn drop(&mut self) {}
 }
 
 pub struct ShaderProgram
@@ -172,7 +159,6 @@ pub struct ShaderProgram
 
     vert_src: Option<String>,
     frag_src: Option<String>,
-    uniform_block_bindings: HashMap<u32, String, std::hash::BuildHasherDefault<XxHash32>>,
     uniform_buffers: ClosedGenVec<UniformBuffer>
 }
 
@@ -183,7 +169,7 @@ impl ShaderProgram
         context.create_program().ok_or_else(|| GfxError::ShaderProgramCreationError(gl_get_errors(&context).to_string()))
     }
 
-    pub fn new(manager: &mut GlManager, vert_src: Option<String>, frag_src: Option<String>) -> Result<(Index, ManagedGlItem), GfxError>
+    pub fn new(context: &Rc<Context>, vert_src: Option<String>, frag_src: Option<String>) -> Result<ShaderProgram, GfxError>
     {
         if vert_src.is_none() && frag_src.is_none()
         {
@@ -191,28 +177,27 @@ impl ShaderProgram
         }
         let program = ShaderProgram
         {
-            internal: ShaderProgram::new_program(&manager.context())?,
-            context: Rc::clone(&manager.context()),
+            internal: ShaderProgram::new_program(&context)?,
+            context: Rc::clone(&context),
             binding_counter: 0,
             vert_src: vert_src,
             frag_src: frag_src,
-            uniform_block_bindings: Default::default(),
             uniform_buffers: ClosedGenVec::new()
         };
-        program.compile(&program.vert_src, &program.frag_src)?;
-        Ok(manager.add_gl_object(program))
+        program.compile()?;
+        Ok(program)
     }
 
     /// Compiles the shader fragments and attaches them to the shader program
-    fn compile(&self, vert_src: &Option<String>, frag_src: &Option<String>) -> Result<(), GfxError>
+    fn compile(&self) -> Result<(), GfxError>
     {
 
-        let vert = if let Some(src) = vert_src
+        let vert = if let Some(src) = &self.vert_src
         {
             Some(self.compile_shader(src, ShaderType::VertexShader)?)
         } else { None };
 
-        let frag = if let Some(src) = frag_src
+        let frag = if let Some(src) = &self.frag_src
         {
             Some(self.compile_shader(src, ShaderType::FragmentShader)?)
         } else { None };
@@ -254,31 +239,30 @@ impl ShaderProgram
         }
     }
 
-    pub fn new_uniform_buffer(&mut self, manager: &mut GlManager, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<(Index, ManagedGlItem), GfxError>
+    pub fn new_uniform_buffer(&mut self, context: &Rc<Context>, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<Index, GfxError>
     {
-        let vert_size = align(&manager.context(), vert_size);
-        let frag_size = align(&manager.context(), frag_size);
+        let vert_size = align(&context, vert_size);
+        // not necessary to align frag size since it isn't used as an offset
+        //let frag_size = align(&context, frag_size);
 
         let index = self.uniform_buffers.insert(
             UniformBuffer
                 {
                     buffer:
                     {
-                        // Create a new buffer and fill it with empty data to size it
-                        let (handle, buffer) = manager.add_gl_object(Buffer::new(&context, Context::UNIFORM_BUFFER)?);
-                        {
-                            let mut buffer = buffer.write().unwrap();
-                            buffer.bind();
-                            buffer.buffer_data_f32(&vec![0f32; (vert_size + frag_size) as usize], draw_type);
-                        }
-                        item
+                        let mut buffer = Buffer::new(&context, Context::UNIFORM_BUFFER)?;
+                        buffer.bind();
+                        buffer.buffer_data_raw(&vec![0u8; (vert_size + frag_size) as usize], draw_type);
+                        buffer
                     },
-                    context: Rc::clone(context),
                     vert_size,
                     frag_size,
 
                     vert_offset: 0,
                     frag_offset: vert_size,
+
+                    vert_name: None,
+                    frag_name: None,
 
                     vert_binding: 0,
                     frag_binding: 0
@@ -300,33 +284,31 @@ impl ShaderProgram
         self.uniform_buffers.get_mut(handle)
     }
 
+    #[allow(dead_code)]
     pub fn delete_uniform_buffer(&mut self, handle: Index) -> Result<(), GfxError>
     {
-        self.uniform_buffers.remove(handle).ok_or(GfxError::InvalidHandle)?;
+        self.uniform_buffers.remove(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?;
         Ok(())
     }
 
     pub fn bind_uniform_buffer(&self, handle: Index) -> Result<(), GfxError>
     {
-        self.get_uniform_buffer(handle).ok_or(GfxError::InvalidHandle)?.bind();
+        self.get_uniform_buffer(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?.buffer.bind();
         Ok(())
     }
 
     #[allow(dead_code)]
     pub fn unbind_uniform_buffer(&self, handle: Index) -> Result<(), GfxError>
     {
-        self.get_uniform_buffer(handle).ok_or(GfxError::InvalidHandle)?.unbind();
+        self.get_uniform_buffer(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?.buffer.unbind();
         Ok(())
     }
 
     add_uniform_block_fn!(vert, frag);
-
-    buffer_fn!(f32, vert, frag);
-    buffer_fn!(i32, vert, frag);
-    buffer_fn!(u32, vert, frag);
+    buffer_fn!(vert, frag);
 }
 
-impl GLObject for ShaderProgram
+impl GlObject for ShaderProgram
 {
     fn bind(&self) { self.context.use_program(Some(&self.internal)); }
     fn unbind(&self) { self.context.use_program(None); }
@@ -334,10 +316,26 @@ impl GLObject for ShaderProgram
     {
         self.context = Rc::clone(context);
         self.internal = ShaderProgram::new_program(&self.context)?;
-        self.compile(self.vert_src, self.frag_src)?;
-        for (binding, block_name) in self.uniform_block_bindings.drain()
+        self.compile()?;
+        self.bind();
+
+        for (_, uniform_buffer) in &mut self.uniform_buffers
         {
-            //self.add
+            uniform_buffer.buffer.reload(&self.context)?;
+            if let Some(block_name) = &uniform_buffer.vert_name
+            {
+                let index = self.context.get_uniform_block_index(&self.internal, block_name.as_str());
+                self.context.uniform_block_binding(&self.internal, index, uniform_buffer.vert_binding);
+                //uniform_buffer.buffer.bind();
+                //uniform_buffer.buffer.bind_range(uniform_buffer.vert_binding, uniform_buffer.vert_offset, uniform_buffer.vert_size);
+            }
+            if let Some(block_name) = &uniform_buffer.frag_name
+            {
+                let index = self.context.get_uniform_block_index(&self.internal, block_name.as_str());
+                self.context.uniform_block_binding(&self.internal, index, uniform_buffer.frag_binding);
+                //uniform_buffer.buffer.bind();
+                //uniform_buffer.buffer.bind_range(uniform_buffer.frag_binding, uniform_buffer.frag_offset, uniform_buffer.frag_size);
+            }
         }
         Ok(())
     }

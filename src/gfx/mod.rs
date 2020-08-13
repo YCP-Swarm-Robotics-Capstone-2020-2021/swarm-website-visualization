@@ -1,16 +1,8 @@
 //! All things graphics related
 
-use std::
-{
-    rc::Rc,
-    sync::{Arc, RwLock},
-};
-use gen_vec::{Index, closed::ClosedGenVec};
-use crate::gfx::
-{
-    shader::shaderprogram::ShaderType,
-    gl_object::GLObject,
-};
+use std::rc::Rc;
+use gen_vec::Index;
+use crate::gfx::shader::shaderprogram::ShaderType;
 
 pub type Context = web_sys::WebGl2RenderingContext;
 
@@ -42,6 +34,7 @@ pub enum GfxError
     /// Error creating a new vertex array
     VertexArrayCreationError(String),
 
+    #[allow(dead_code)]
     /// Anything else
     Other(String)
 }
@@ -111,7 +104,7 @@ pub fn gl_get_errors(context: &Context) -> GfxError
     let mut error: GlError = context.get_error().into();
     if error != GlError::NoError
     {
-        let errors = vec![];
+        let mut errors = vec![];
 
         while error != GlError::NoError
         {
@@ -137,59 +130,6 @@ pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Rc<Context>, &
             },
         _ => Err("failed to get webgl2 context from canvas")
     }
-}
-
-
-
-lazy_static!
-{
-    static ref GL_OBJECT_RELOADER: RwLock<Vec<Arc<RwLock<dyn GLObject + Send + Sync>>>> = RwLock::new(vec![]);
-}
-pub fn reload_gl_objects(context: &Rc<Context>) -> Result<(), String>
-{
-    for obj in GL_OBJECT_RELOADER.write().or_else(|e| Err(e.to_string()))?.iter_mut()
-    {
-        obj.write().or_else(|e| Err(e.to_string()))?.reload(&context);
-    }
-    Ok(())
-}
-
-pub type ManagedGlItem = Arc<RwLock<Box<dyn GLObject + 'static>>>;
-pub struct GlManager
-{
-    context: Rc<Context>,
-    gl_objects: ClosedGenVec<ManagedGlItem>
-}
-
-impl GlManager
-{
-    pub fn new(context: &Rc<Context>) -> Arc<RwLock<GlManager>>
-    {
-        Arc::new(RwLock::new(GlManager
-        {
-            context: Rc::clone(&context),
-            gl_objects: ClosedGenVec::new()
-        }))
-    }
-    pub fn context(&self) -> &Rc<Context> { &self.context }
-
-    pub fn add_gl_object<T>(&mut self, gl_object: T) -> (Index, ManagedGlItem) where T: GLObject + 'static
-    {
-        let item: ManagedGlItem = Arc::new(RwLock::new(Box::new(gl_object)));
-        (self.gl_objects.insert(item.clone()), item.clone())
-    }
-
-    pub fn remove_gl_object(&mut self, handle: Index)
-    {
-        //self.gl_objects.remove(handle)
-        unimplemented!()
-    }
-
-    //pub fn get_gl_object(index: Index) -> Option<&dyn GLObject>
-
-    // store all stuff in Arc<RwLock
-    // get() returns unwrapped arc.read
-    // get_mut() returns unwrapped arc.write
 }
 
 pub mod transform;

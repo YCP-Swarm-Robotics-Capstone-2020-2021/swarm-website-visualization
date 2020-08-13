@@ -3,66 +3,106 @@
 use crate::gfx::
 {
     Context,
-    GlManager,
     GfxError,
     gl_get_errors,
-    gl_object::GLObject
+    gl_object::GlObject,
+    buffer::Buffer,
 };
 use web_sys::WebGlVertexArrayObject;
 use std::rc::Rc;
-use gen_vec::Index;
+use gen_vec::{Index, exposed::{IndexAllocator, ExposedGenVec}};
 
 #[derive(Debug, Copy, Clone)]
-struct AttribPointer(u32, i32, u32, bool, i32, i32);
+pub struct AttribPointer
+{
+    index: u32,
+    size: i32,
+    data_type: u32,
+    normalized: bool,
+    stride: i32,
+    offset: i32
+}
+
+impl AttribPointer
+{
+    #[allow(dead_code)]
+    /// Default values of `false` for `normalized` and `size_of<T>()` for `stride`
+    pub fn with_defaults<T>(index: u32, size: i32, data_type: u32, offset: i32) -> AttribPointer
+    {
+        AttribPointer
+        {
+            index,
+            size,
+            data_type,
+            normalized: false,
+            stride: size * std::mem::size_of::<T>() as i32,
+            offset
+        }
+    }
+
+    #[allow(dead_code)]
+    /// No default values
+    pub fn without_defaults(index: u32, size: i32, data_type: u32, normalized: bool, stride: i32, offset: i32) -> AttribPointer
+    {
+        AttribPointer
+        {
+            index, size, data_type, normalized, stride, offset
+        }
+    }
+}
 
 pub struct VertexArray
 {
     internal: WebGlVertexArrayObject,
     context: Rc<Context>,
-    attrib_ptrs: Vec<Option<AttribPointer>>
+    allocator: IndexAllocator,
+    buffers: ExposedGenVec<Buffer>,
+    attrib_ptrs: ExposedGenVec<Option<Vec<AttribPointer>>>
 }
 
 impl VertexArray
 {
     fn new_vertex_array(context: &Context) -> Result<WebGlVertexArrayObject, GfxError>
     {
-        context.create_vertex_array().ok_or_else(|| GfxError::VertexArrayCreationError(gl_get_errors(context)))
+        context.create_vertex_array().ok_or_else(|| GfxError::VertexArrayCreationError(gl_get_errors(context).to_string()))
     }
 
-    pub fn new(manager: &GlManager) -> Result<Index, GfxError>
+    pub fn new(context: &Rc<Context>) -> Result<VertexArray, GfxError>
     {
-        let va = VertexArray
+        Ok(VertexArray
         {
-            internal: VertexArray::new_vertex_array(&manager.context())?,
-            context: Rc::clone(&manager.context()),
-            attrib_ptrs: vec![]
-        };
-        Ok(manager.add_gl_object(va))
+            internal: VertexArray::new_vertex_array(&context)?,
+            context: Rc::clone(&context),
+            allocator: IndexAllocator::new(),
+            buffers: ExposedGenVec::new(),
+            attrib_ptrs: ExposedGenVec::new(),
+        })
     }
 
-    /// glVertexAttribPtr with default values of `false` for `normalized` and `size_of<T>()` for `stride`
-    /// This function also enables the vertex attrib array at `index`
-    pub fn attrib_ptr<T>(&mut self, index: u32, size: i32, data_type: u32, offset: i32)
+    pub fn add_buffer(&mut self, buffer: Buffer, attrib_ptrs: Option<Vec<AttribPointer>>) -> Index
     {
-        self.attrib_ptr_raw(index, size, data_type, false, size * std::mem::size_of::<T>() as i32, offset);
-    }
-
-    /// glVertexAttribPtr with no default values
-    /// This function also enables the vertex attrib array at `index`
-    pub fn attrib_ptr_raw(&mut self, index: u32, size: i32, data_type: u32, normalized: bool, stride: i32, offset: i32)
-    {
-        self.context.vertex_attrib_pointer_with_i32(index, size, data_type, normalized, stride, offset);
-        self.context.enable_vertex_attrib_array(index);
-
-        if self.attrib_ptrs.len() <= index as usize
+        buffer.bind();
+        if let Some(attrib_ptrs) = &attrib_ptrs
         {
-            self.attrib_ptrs.resize_with(index as usize + 1, || None);
+            self.set_attrib_ptrs(&attrib_ptrs);
         }
-        self.attrib_ptrs[index as usize] = Some(AttribPointer(index, size, data_type, normalized, stride, offset));
+        let handle = self.allocator.allocate();
+        self.buffers.set(handle, buffer);
+        self.attrib_ptrs.set(handle, attrib_ptrs);
+        handle
+    }
+
+    fn set_attrib_ptrs(&self, attrib_ptrs: &Vec<AttribPointer>)
+    {
+        for ptr in attrib_ptrs
+        {
+            self.context.vertex_attrib_pointer_with_i32(ptr.index, ptr.size, ptr.data_type, ptr.normalized, ptr.stride, ptr.offset);
+            self.context.enable_vertex_attrib_array(ptr.index);
+        }
     }
 }
 
-impl GLObject for VertexArray
+impl GlObject for VertexArray
 {
     fn bind(&self)
     {
@@ -76,22 +116,20 @@ impl GLObject for VertexArray
     {
         self.context = Rc::clone(&context);
         self.internal = VertexArray::new_vertex_array(&self.context)?;
+        self.bind();
 
-        let attrib_ptrs = self.attrib_ptrs.to_owned();
-        for attrib_ptr in attrib_ptrs
+        for (_, buffer) in &mut self.buffers
         {
-            if let Some(attrib_ptr) = attrib_ptr
+            buffer.reload(&self.context)?;
+        }
+        for (_, attrib_ptrs) in &self.attrib_ptrs
+        {
+            if let Some(attrib_ptrs) = &attrib_ptrs
             {
-                self.attrib_ptr_raw(
-                    attrib_ptr.0,
-                    attrib_ptr.1,
-                    attrib_ptr.2,
-                    attrib_ptr.3,
-                    attrib_ptr.4,
-                    attrib_ptr.5
-                );
+                self.set_attrib_ptrs(&attrib_ptrs);
             }
         }
+
         Ok(())
     }
 }
