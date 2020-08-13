@@ -103,17 +103,16 @@ impl GlObject for Buffer
         self.context = Rc::clone(&context);
         self.internal = Buffer::new_buffer(&self.context)?;
         self.bind();
+        self.context.buffer_data_with_u8_array(self.buffer_type, &self.buffer, self.draw_type);
 
         let range_bindings = self.range_bindings.to_owned();
         for range_binding in range_bindings
         {
             if let Some(range_binding) = range_binding
             {
-                crate::log(format!("{:?}", range_binding).as_str());
                 self.bind_range(range_binding.0, range_binding.1, range_binding.2);
             }
         }
-        self.context.buffer_data_with_u8_array(self.buffer_type, &self.buffer, self.draw_type);
 
         Ok(())
     }

@@ -10,8 +10,7 @@ use web_sys::
     window,
     Window,
     Document,
-    HtmlCanvasElement,
-    EventListener,
+    HtmlCanvasElement
 };
 use std::{rc::Rc, cell::RefCell};
 
@@ -20,12 +19,13 @@ use crate::
     gfx::
     {
         Context,
+        new_context,
         gl_object::GlObject,
         shader::
         {
             shaderprogram::ShaderProgram,
             shadersrc,
-            //uniform_buffer::UniformBuffer,
+            uniform_buffer::UniformBuffer,
         },
         vertex_array::{AttribPointer, VertexArray},
         buffer::Buffer,
@@ -33,7 +33,6 @@ use crate::
     }
 };
 use cgmath::{Matrix4, Vector3, vec3, Vector4};
-use crate::gfx::new_context;
 
 mod gfx;
 
@@ -74,12 +73,11 @@ pub fn main() -> Result<(), JsValue>
             let elem = document.get_element_by_id("canvas").expect("canvas handle");
             elem.dyn_into::<HtmlCanvasElement>()?
         };
-    let context = gfx::new_context(&canvas)?;
+    let context = new_context(&canvas)?;
 
     let mut shaderprog =
         ShaderProgram::new(&context, Some(shadersrc::BASIC_VERT.to_string()), Some(shadersrc::BASIC_FRAG.to_string()))
             .expect("shader program");
-    //gl_objects.push(shaderprog);
     shaderprog.bind();
 
     // Triangle point data
@@ -109,7 +107,7 @@ pub fn main() -> Result<(), JsValue>
 
     let mut transformation = Transformation::new();
 
-    let ub_handle = shaderprog.new_uniform_buffer(
+    let mut uniform_buffer = UniformBuffer::new(
         &context,
         std::mem::size_of::<Matrix4<f32>>() as i32,
         // Needs to be Vector4 even though its actually a Vector3
@@ -117,19 +115,18 @@ pub fn main() -> Result<(), JsValue>
         std::mem::size_of::<Vector4<f32>>() as i32,
         Context::STATIC_DRAW
     ).expect("uniform buffer handle");
-    crate::log_s(format!("f{}", std::mem::size_of::<Matrix4<f32>>() as i32));
-    shaderprog.bind_uniform_buffer(ub_handle).expect("bound uniform buffer");
+    uniform_buffer.bind();
 
-    shaderprog.add_vert_uniform_block(ub_handle, "VertData").expect("VertData uniform block");
-    shaderprog.add_frag_uniform_block(ub_handle, "FragData").expect("FragData uniform block");
+    uniform_buffer.add_vert_block(&mut shaderprog, "VertData").expect("VertData bound");
+    uniform_buffer.add_frag_block(&mut shaderprog, "FragData").expect("FragData bound");
 
     transformation.global.translate(&vec3(-0.5, 0.0, 0.0));
     let buff: &[f32; 16] = transformation.matrix().as_ref();
-    shaderprog.buffer_vert_uniform_data(ub_handle, buff).expect("transformation buffered");
+    uniform_buffer.buffer_vert_data(buff);
 
     let color: Vector3<f32> = vec3(253.0/255.0, 94.0/255.0, 0.0);
     let buff: &[f32; 3] = color.as_ref();
-    shaderprog.buffer_frag_uniform_data(ub_handle, buff).expect("color buffered");
+    uniform_buffer.buffer_frag_data(buff);
 
     va.bind();
     context.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -148,12 +145,12 @@ pub fn main() -> Result<(), JsValue>
     }
     {
         let canvas_clone = canvas.clone();
-        let callback = Closure::wrap(Box::new(move |event: web_sys::WebGlContextEvent|
+        let callback = Closure::wrap(Box::new(move |_event: web_sys::WebGlContextEvent|
             {
                 //let canvas = canvas_clone;
-                let context = gfx::new_context(&canvas_clone).unwrap();
+                let context = new_context(&canvas_clone).unwrap();
                 shaderprog.reload(&context).expect("shader program reloaded");
-                shaderprog.bind_uniform_buffer(ub_handle);
+                uniform_buffer.reload(&context).expect("uniform buffer reloaded");
                 va.reload(&context).expect("vertex array reloaded");
 
                 context.clear_color(0.0, 0.0, 0.0, 1.0);
