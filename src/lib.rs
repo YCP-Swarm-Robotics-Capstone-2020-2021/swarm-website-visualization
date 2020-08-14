@@ -12,7 +12,16 @@ use web_sys::
     Document,
     HtmlCanvasElement
 };
-use std::{rc::Rc, cell::RefCell};
+use std::
+{
+    rc::Rc,
+    cell::
+    {
+        Cell,
+        RefCell
+    },
+    boxed::Box,
+};
 
 use crate::
 {
@@ -33,6 +42,7 @@ use crate::
     }
 };
 use cgmath::{Matrix4, Vector3, vec3, Vector4};
+use crate::gfx::GfxError;
 
 mod gfx;
 
@@ -66,12 +76,12 @@ pub fn main() -> Result<(), JsValue>
     #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let window: Window = window().expect("window context");
+    let window: Rc<Window> = Rc::new(window().expect("window context"));
     let document: Document = window.document().expect("document context");
     let canvas =
         {
             let elem = document.get_element_by_id("canvas").expect("canvas handle");
-            elem.dyn_into::<HtmlCanvasElement>()?
+            Rc::new(elem.dyn_into::<HtmlCanvasElement>()?)
         };
     let context = new_context(&canvas)?;
 
@@ -135,33 +145,91 @@ pub fn main() -> Result<(), JsValue>
 
     log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
+    let shaderprog = Rc::new(RefCell::new(shaderprog));
+    let uniform_buffer = Rc::new(RefCell::new(uniform_buffer));
+    let va = Rc::new(RefCell::new(va));
+    /// Context container so the context can be updated from within the restored callback
+    /// First Rc is to allow the container to be cloned and then moved into the callback
+    /// RefCell is for interior mutability
+    let context: Rc<RefCell<Rc<Context>>> = Rc::new(RefCell::new(context));
+
+    /// I feel like this is overly complicated, but I'm not sure of a better way to maintain
+    /// a vector of things that need to be reloaded while allowing them to be used
+    /// without accessing them through the vector
+    let globjects: Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>> = Rc::new(RefCell::new(
+        vec![shaderprog.clone(), uniform_buffer.clone(), va.clone()]
+    ));
+
+    init_on_context_lost(&canvas)?;
+    init_on_context_restored(&canvas, &context, &globjects)?;
+
     {
-        let callback = Closure::wrap(Box::new(move |event: web_sys::WebGlContextEvent|
+        let window_clone = Rc::clone(&window);
+        let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
+        let g = Rc::clone(&f);
+        let context = context.borrow().clone();
+
+        let uniform_buffer = uniform_buffer.clone();
+
+        *g.borrow_mut() = Some(Closure::wrap(Box::new(move ||
             {
-                event.prevent_default();
-            }) as Box<dyn FnMut(_)>);
-        canvas.add_event_listener_with_callback("webglcontextlost", callback.as_ref().unchecked_ref())?;
-        callback.forget();
-    }
-    {
-        let canvas_clone = canvas.clone();
-        let callback = Closure::wrap(Box::new(move |_event: web_sys::WebGlContextEvent|
-            {
-                //let canvas = canvas_clone;
-                let context = new_context(&canvas_clone).unwrap();
-                shaderprog.recreate_and_reload(&context).expect("shader program reloaded");
-                uniform_buffer.recreate_and_reload(&context).expect("uniform buffer reloaded");
-                va.recreate_and_reload(&context).expect("vertex array reloaded");
+                let mut uniform_buffer = uniform_buffer.borrow_mut();
+                //let context = context;
+
+                let buff: &[f32; 16] = transformation.matrix().as_ref();
+                uniform_buffer.buffer_vert_data(buff);
 
                 context.clear_color(0.0, 0.0, 0.0, 1.0);
                 context.clear(Context::COLOR_BUFFER_BIT);
                 context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
-                log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
-
-            }) as Box<dyn FnMut(_)>);
-        canvas.add_event_listener_with_callback("webglcontextrestored", callback.as_ref().unchecked_ref())?;
-        callback.forget();
+                window_clone.request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref());
+            }) as Box<dyn FnMut()>));
+        window.request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref());
     }
 
     Ok(())
 }
+
+fn init_on_context_lost(canvas: &HtmlCanvasElement) -> Result<(), JsValue>
+{
+    let callback = Closure::wrap(Box::new(move |event: web_sys::WebGlContextEvent|
+        {
+            event.prevent_default();
+        }) as Box<dyn FnMut(_)>);
+    canvas.add_event_listener_with_callback("webglcontextlost", callback.as_ref().unchecked_ref())?;
+    callback.forget();
+    Ok(())
+}
+
+fn init_on_context_restored(canvas: &Rc<HtmlCanvasElement>, context: &Rc<RefCell<Rc<Context>>>, to_restore: &Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>>) -> Result<(), JsValue>
+{
+    let callback =
+        {
+            let canvas = canvas.clone();
+            let context = context.clone();
+            let to_restore = to_restore.clone();
+            Closure::wrap(Box::new(move |_event: web_sys::WebGlContextEvent|
+                {
+                    *context.borrow_mut() = new_context(&canvas).unwrap();
+                    on_context_restored(&context.borrow(), &to_restore.borrow());
+
+                }) as Box<dyn FnMut(_)>)
+        };
+    canvas.add_event_listener_with_callback("webglcontextrestored", callback.as_ref().unchecked_ref())?;
+    callback.forget();
+    Ok(())
+}
+
+fn on_context_restored(context: &Rc<Context>, to_restore: &Vec<Rc<RefCell<dyn GlObject>>>) -> Result<(), GfxError>
+{
+    for obj in to_restore.iter()
+    {
+        obj.borrow_mut().recreate_and_reload(&context)?;
+    }
+
+    log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
+
+    Ok(())
+}
+
+//fn init_render_loop()
