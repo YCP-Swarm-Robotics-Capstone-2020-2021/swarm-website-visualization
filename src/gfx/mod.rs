@@ -119,6 +119,9 @@ pub fn gl_get_errors(context: &Context) -> GfxError
     }
 }
 
+/// Gets a new context from the canvas
+/// Returns the Context within an Rc to allow the context to be stored and referenced
+/// by GlObjects
 pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Rc<Context>, &'static str>
 {
     match canvas.get_context("webgl2")
