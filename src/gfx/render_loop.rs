@@ -58,7 +58,7 @@ impl RenderLoop
             canvas: canvas.clone(),
             context: context.clone(),
             gl_objects: gl_objects.clone(),
-            valid_context: Rc::new(RefCell::new(false)),
+            valid_context: Rc::new(RefCell::new(true)),
             running: Rc::new(RefCell::new(false)),
             raf_callback: Rc::new(RefCell::new(None)),
             raf_handle: Rc::new(RefCell::new(-1)),

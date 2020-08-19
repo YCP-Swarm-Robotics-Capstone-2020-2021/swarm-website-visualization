@@ -137,17 +137,7 @@ pub fn main() -> Result<(), JsValue>
     let buff: &[f32; 3] = color.as_ref();
     uniform_buffer.buffer_frag_data(buff);
 
-    va.bind();
-    context.clear_color(0.0, 0.0, 0.0, 1.0);
-    context.clear(Context::COLOR_BUFFER_BIT);
-    context.draw_elements_with_i32(Context::TRIANGLES, indices.len() as i32, Context::UNSIGNED_INT, 0);
-
-    log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
-
-    //let transformation = Rc::new(RefCell::new(transformation));
-    /*let shaderprog = Rc::new(RefCell::new(shaderprog));
-    let uniform_buffer = Rc::new(RefCell::new(uniform_buffer));
-    let va = Rc::new(RefCell::new(va));*/
+    crate::log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
     wrap!(transformation, shaderprog, uniform_buffer, va);
 
@@ -177,13 +167,17 @@ pub fn main() -> Result<(), JsValue>
                     let context = context.borrow();
                     context.clear_color(0.0, 0.0, 0.0, 1.0);
                     context.clear(Context::COLOR_BUFFER_BIT);
+
+                    va.bind();
                     context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
+                    log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
+
                 }
         };
 
 
     let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &globjects, render_func).expect("render_loop")));
-    render_loop.borrow_mut().start().unwrap();
+    //render_loop.borrow_mut().start().unwrap();
 
     {
         let render_loop = render_loop.clone();
