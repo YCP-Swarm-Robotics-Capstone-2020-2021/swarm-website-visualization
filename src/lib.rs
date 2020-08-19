@@ -15,11 +15,7 @@ use web_sys::
 use std::
 {
     rc::Rc,
-    cell::
-    {
-        Cell,
-        RefCell
-    },
+    cell::RefCell,
     boxed::Box,
 };
 
@@ -29,6 +25,7 @@ use crate::
     {
         Context,
         new_context,
+        render_loop::RenderLoop,
         gl_object::GlObject,
         shader::
         {
@@ -41,8 +38,16 @@ use crate::
         transform::Transformation,
     }
 };
-use cgmath::{Matrix4, Vector3, vec3, Vector4};
-use crate::gfx::GfxError;
+use cgmath::
+{
+    Matrix4,
+    Vector3,
+    vec3,
+    Vector4
+};
+
+#[macro_use]
+mod redeclare;
 
 mod gfx;
 
@@ -62,12 +67,6 @@ extern
 fn log_s(s: String)
 {
     log(s.as_str());
-}
-
-#[wasm_bindgen]
-pub fn pointless_binding(msg: &str)
-{
-    alert(msg);
 }
 
 #[wasm_bindgen(start)]
@@ -145,91 +144,68 @@ pub fn main() -> Result<(), JsValue>
 
     log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
-    let shaderprog = Rc::new(RefCell::new(shaderprog));
+    //let transformation = Rc::new(RefCell::new(transformation));
+    /*let shaderprog = Rc::new(RefCell::new(shaderprog));
     let uniform_buffer = Rc::new(RefCell::new(uniform_buffer));
-    let va = Rc::new(RefCell::new(va));
-    /// Context container so the context can be updated from within the restored callback
-    /// First Rc is to allow the container to be cloned and then moved into the callback
-    /// RefCell is for interior mutability
+    let va = Rc::new(RefCell::new(va));*/
+
+    wrap!(transformation, shaderprog, uniform_buffer, va);
+
+    // Context container so the context can be updated from within the restored callback
+    // First Rc is to allow the container to be cloned and then moved into the callback
+    // RefCell is for interior mutability
     let context: Rc<RefCell<Rc<Context>>> = Rc::new(RefCell::new(context));
 
-    /// I feel like this is overly complicated, but I'm not sure of a better way to maintain
-    /// a vector of things that need to be reloaded while allowing them to be used
-    /// without accessing them through the vector
+    // I feel like this is overly complicated, but I'm not sure of a better way to maintain
+    // a vector of things that need to be reloaded while allowing them to be used
+    // without accessing them through the vector
     let globjects: Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>> = Rc::new(RefCell::new(
         vec![shaderprog.clone(), uniform_buffer.clone(), va.clone()]
     ));
 
-    init_on_context_lost(&canvas)?;
-    init_on_context_restored(&canvas, &context, &globjects)?;
-
-    {
-        let window_clone = Rc::clone(&window);
-        let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
-        let g = Rc::clone(&f);
-        let context = context.borrow().clone();
-
-        let uniform_buffer = uniform_buffer.clone();
-
-        *g.borrow_mut() = Some(Closure::wrap(Box::new(move ||
-            {
-                let mut uniform_buffer = uniform_buffer.borrow_mut();
-                //let context = context;
-
-                let buff: &[f32; 16] = transformation.matrix().as_ref();
-                uniform_buffer.buffer_vert_data(buff);
-
-                context.clear_color(0.0, 0.0, 0.0, 1.0);
-                context.clear(Context::COLOR_BUFFER_BIT);
-                context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
-                window_clone.request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref());
-            }) as Box<dyn FnMut()>));
-        window.request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref());
-    }
-
-    Ok(())
-}
-
-fn init_on_context_lost(canvas: &HtmlCanvasElement) -> Result<(), JsValue>
-{
-    let callback = Closure::wrap(Box::new(move |event: web_sys::WebGlContextEvent|
+    let render_func =
         {
-            event.prevent_default();
-        }) as Box<dyn FnMut(_)>);
-    canvas.add_event_listener_with_callback("webglcontextlost", callback.as_ref().unchecked_ref())?;
-    callback.forget();
-    Ok(())
-}
+            clone!(context, transformation, uniform_buffer);
 
-fn init_on_context_restored(canvas: &Rc<HtmlCanvasElement>, context: &Rc<RefCell<Rc<Context>>>, to_restore: &Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>>) -> Result<(), JsValue>
-{
-    let callback =
-        {
-            let canvas = canvas.clone();
-            let context = context.clone();
-            let to_restore = to_restore.clone();
-            Closure::wrap(Box::new(move |_event: web_sys::WebGlContextEvent|
+            move ||
                 {
-                    *context.borrow_mut() = new_context(&canvas).unwrap();
-                    on_context_restored(&context.borrow(), &to_restore.borrow());
+                    borrow_mut!(transformation, uniform_buffer);
 
-                }) as Box<dyn FnMut(_)>)
+                    let buff: &[f32; 16] = transformation.matrix().as_ref();
+                    uniform_buffer.buffer_vert_data(buff);
+
+                    let context = context.borrow();
+                    context.clear_color(0.0, 0.0, 0.0, 1.0);
+                    context.clear(Context::COLOR_BUFFER_BIT);
+                    context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
+                }
         };
-    canvas.add_event_listener_with_callback("webglcontextrestored", callback.as_ref().unchecked_ref())?;
-    callback.forget();
-    Ok(())
-}
 
-fn on_context_restored(context: &Rc<Context>, to_restore: &Vec<Rc<RefCell<dyn GlObject>>>) -> Result<(), GfxError>
-{
-    for obj in to_restore.iter()
+
+    let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &globjects, render_func).expect("render_loop")));
+    render_loop.borrow_mut().start().unwrap();
+
     {
-        obj.borrow_mut().recreate_and_reload(&context)?;
+        let render_loop = render_loop.clone();
+
+        let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
+            log_s(event.key());
+            if event.key() == "1"
+            {
+                render_loop.borrow_mut().start().expect("render loop started");
+            }
+            else if event.key() == "2"
+            {
+                render_loop.borrow_mut().pause().expect("render loop paused");
+            }
+            else if event.key() == "3"
+            {
+                render_loop.borrow_mut().cleanup();
+            }
+        }) as Box<dyn FnMut(_)>);
+        canvas.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;
+        closure.forget();
     }
 
-    log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
-
     Ok(())
 }
-
-//fn init_render_loop()

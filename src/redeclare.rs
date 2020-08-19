@@ -33,6 +33,7 @@ macro_rules! wrap
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! borrow
 {
     ($($var:ident),+) =>

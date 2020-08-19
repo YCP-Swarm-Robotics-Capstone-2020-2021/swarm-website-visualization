@@ -34,6 +34,10 @@ pub enum GfxError
     /// Error creating a new vertex array
     VertexArrayCreationError(String),
 
+    RenderLoopAlreadyRunning,
+    RenderLoopNotRunning,
+    RenderLoopAlreadyCleanedUp,
+
     #[allow(dead_code)]
     /// Anything else
     Other(String)
@@ -140,3 +144,4 @@ pub mod gl_object;
 pub mod shader;
 pub mod vertex_array;
 pub mod buffer;
+pub mod render_loop;

@@ -34,8 +34,9 @@ features = [
     # Generic JS stuff
     'Document',
     'Element',
-    'HtmlCanvasElement',
     'Window',
+    'HtmlCanvasElement',
+    'KeyboardEvent',
 
     # WebGL stuff
     'WebGl2RenderingContext',
