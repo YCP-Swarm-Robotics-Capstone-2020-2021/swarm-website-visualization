@@ -168,7 +168,7 @@ pub fn main() -> Result<(), JsValue>
                     context.clear_color(0.0, 0.0, 0.0, 1.0);
                     context.clear(Context::COLOR_BUFFER_BIT);
 
-                    va.bind();
+                    va.borrow().bind();
                     context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
                     log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
