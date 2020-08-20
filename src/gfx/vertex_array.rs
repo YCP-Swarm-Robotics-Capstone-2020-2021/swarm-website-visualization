@@ -9,7 +9,6 @@ use crate::gfx::
     buffer::Buffer,
 };
 use web_sys::WebGlVertexArrayObject;
-use std::rc::Rc;
 use gen_vec::{Index, exposed::{IndexAllocator, ExposedGenVec}};
 
 #[derive(Debug, Copy, Clone)]
@@ -54,7 +53,7 @@ impl AttribPointer
 pub struct VertexArray
 {
     internal: WebGlVertexArrayObject,
-    context: Rc<Context>,
+    context: Context,
     allocator: IndexAllocator,
     buffers: ExposedGenVec<Buffer>,
     attrib_ptrs: ExposedGenVec<Option<Vec<AttribPointer>>>
@@ -68,12 +67,12 @@ impl VertexArray
     }
 
     /// Creates a new vertex array
-    pub fn new(context: &Rc<Context>) -> Result<VertexArray, GfxError>
+    pub fn new(context: &Context) -> Result<VertexArray, GfxError>
     {
         Ok(VertexArray
         {
             internal: VertexArray::new_vertex_array(&context)?,
-            context: Rc::clone(&context),
+            context: context.clone(),
             allocator: IndexAllocator::new(),
             buffers: ExposedGenVec::new(),
             attrib_ptrs: ExposedGenVec::new(),
@@ -133,9 +132,9 @@ impl GlObject for VertexArray
     {
         self.context.bind_vertex_array(None);
     }
-    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
+    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
     {
-        self.context = Rc::clone(&context);
+        self.context = context.clone();
         self.internal = VertexArray::new_vertex_array(&self.context)?;
         Ok(())
     }

@@ -75,12 +75,12 @@ pub fn main() -> Result<(), JsValue>
     #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let window: Rc<Window> = Rc::new(window().expect("window context"));
+    let window: Window = window().expect("window context");
     let document: Document = window.document().expect("document context");
     let canvas =
         {
             let elem = document.get_element_by_id("canvas").expect("canvas handle");
-            Rc::new(elem.dyn_into::<HtmlCanvasElement>()?)
+            elem.dyn_into::<HtmlCanvasElement>()?
         };
     let context = new_context(&canvas)?;
 
@@ -144,7 +144,7 @@ pub fn main() -> Result<(), JsValue>
     // Context container so the context can be updated from within the restored callback
     // First Rc is to allow the container to be cloned and then moved into the callback
     // RefCell is for interior mutability
-    let context: Rc<RefCell<Rc<Context>>> = Rc::new(RefCell::new(context));
+    let context: Rc<RefCell<Context>> = Rc::new(RefCell::new(context));
 
     // I feel like this is overly complicated, but I'm not sure of a better way to maintain
     // a vector of things that need to be reloaded while allowing them to be used

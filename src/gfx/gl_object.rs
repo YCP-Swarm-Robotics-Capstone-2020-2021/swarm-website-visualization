@@ -10,11 +10,11 @@ pub trait GlObject: Drop
     /// Recreates internal webgl program(s)
     /// The only states/data that should be reloaded here are those that are set within
     /// a `new()` function or something similar
-    fn recreate(&mut self, context: &std::rc::Rc<crate::Context>) -> Result<(), crate::gfx::GfxError>;
+    fn recreate(&mut self, context: &crate::Context) -> Result<(), crate::gfx::GfxError>;
     /// Reloads all webgl states and data associated with this webgl object
     fn reload(&mut self) -> Result<(), crate::gfx::GfxError>;
     /// Calls `recreate()` and then `reload()`
-    fn recreate_and_reload(&mut self, context: &std::rc::Rc<crate::Context>) -> Result<(), crate::gfx::GfxError>
+    fn recreate_and_reload(&mut self, context: &crate::Context) -> Result<(), crate::gfx::GfxError>
     {
         self.recreate(&context)?;
         self.reload()?;

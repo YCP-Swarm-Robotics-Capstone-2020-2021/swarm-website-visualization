@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use web_sys::{WebGlProgram, WebGlShader};
 use crate::gfx::
 {
@@ -51,7 +50,7 @@ impl Into<u32> for ShaderType
 pub struct ShaderProgram
 {
     internal: WebGlProgram,
-    context: Rc<Context>,
+    context: Context,
 
     vert_src: Option<String>,
     frag_src: Option<String>,
@@ -66,7 +65,7 @@ impl ShaderProgram
         context.create_program().ok_or_else(|| GfxError::ShaderProgramCreationError(gl_get_errors(&context).to_string()))
     }
 
-    pub fn new(context: &Rc<Context>, vert_src: Option<String>, frag_src: Option<String>) -> Result<ShaderProgram, GfxError>
+    pub fn new(context: &Context, vert_src: Option<String>, frag_src: Option<String>) -> Result<ShaderProgram, GfxError>
     {
         if vert_src.is_none() && frag_src.is_none()
         {
@@ -75,7 +74,7 @@ impl ShaderProgram
         let program = ShaderProgram
         {
             internal: ShaderProgram::new_program(&context)?,
-            context: Rc::clone(&context),
+            context: context.clone(),
             vert_src: vert_src,
             frag_src: frag_src,
             block_bindings: vec![]
@@ -161,9 +160,9 @@ impl GlObject for ShaderProgram
 {
     fn bind(&self) { self.context.use_program(Some(&self.internal)); }
     fn unbind(&self) { self.context.use_program(None); }
-    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
+    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
     {
-        self.context = Rc::clone(&context);
+        self.context = context.clone();
         self.internal = ShaderProgram::new_program(&self.context)?;
         self.compile()?;
         Ok(())

@@ -25,9 +25,9 @@ use crate::gfx::
 
 pub struct RenderLoop
 {
-    window: Rc<Window>,
-    canvas: Rc<HtmlCanvasElement>,
-    context: Rc<RefCell<Rc<Context>>>,
+    window: Window,
+    canvas: HtmlCanvasElement,
+    context: Rc<RefCell<Context>>,
     // GlObjects to be stored during context loss recovery
     gl_objects: Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>>,
     valid_context: Rc<RefCell<bool>>,
@@ -45,9 +45,9 @@ impl RenderLoop
     /// `RenderLoop` will call `GlObject::recreate_and_reload()` for each item in
     /// `globjects` in the even of a context loss
     pub fn init<T: 'static + FnMut()>(
-        window: &Rc<Window>,
-        canvas: &Rc<HtmlCanvasElement>,
-        context: &Rc<RefCell<Rc<Context>>>,
+        window: &Window,
+        canvas: &HtmlCanvasElement,
+        context: &Rc<RefCell<Context>>,
         gl_objects: &Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>>,
         render_func: T
     ) -> Result<RenderLoop, GfxError>
