@@ -13,14 +13,18 @@ use web_sys::
     Window,
     HtmlCanvasElement,
 };
-use crate::gfx::
+use crate::
 {
-    Context,
-    new_context,
-    GfxError,
-    GlError,
-    gl_get_errors,
-    gl_object::GlObject,
+    input::listener::EventListener,
+    gfx::
+    {
+        Context,
+        new_context,
+        GfxError,
+        GlError,
+        gl_get_errors,
+        gl_object::GlObject,
+    },
 };
 
 pub struct RenderLoop
@@ -28,9 +32,11 @@ pub struct RenderLoop
     window: Window,
     canvas: HtmlCanvasElement,
     context: Rc<RefCell<Context>>,
+    context_lost_ev: Option<EventListener>,
+    context_restored_ev: Option<EventListener>,
+    valid_context: Rc<RefCell<bool>>,
     // GlObjects to be stored during context loss recovery
     gl_objects: Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>>,
-    valid_context: Rc<RefCell<bool>>,
     // Is the render loop running
     running: Rc<RefCell<bool>>,
     // request_animation_frame() callback that calls given render func
@@ -57,8 +63,10 @@ impl RenderLoop
             window: window.clone(),
             canvas: canvas.clone(),
             context: context.clone(),
-            gl_objects: gl_objects.clone(),
+            context_lost_ev: None,
+            context_restored_ev: None,
             valid_context: Rc::new(RefCell::new(true)),
+            gl_objects: gl_objects.clone(),
             running: Rc::new(RefCell::new(false)),
             raf_callback: Rc::new(RefCell::new(None)),
             raf_handle: Rc::new(RefCell::new(-1)),
@@ -72,26 +80,27 @@ impl RenderLoop
     }
 
     /// Initialize the callback for a context lost even
-    fn init_on_context_lost(&self)
+    fn init_on_context_lost(&mut self)
     {
         clone!(self.valid_context);
-        let callback = Closure::wrap(Box::new(move |event: web_sys::WebGlContextEvent|
-            {
-                event.prevent_default();
-                *valid_context.borrow_mut() = false;
-            }
-        ) as Box<dyn FnMut(_)>);
-        self.canvas.add_event_listener_with_callback("webglcontextlost", callback.as_ref().unchecked_ref()).expect("webglcontextlost event listener added");
-        callback.forget();
+        let ev = EventListener::new(&self.canvas, "webglcontextlost",
+                                    move |event: web_sys::WebGlContextEvent|
+                                        {
+                                            event.prevent_default();
+                                            *valid_context.borrow_mut() = false;
+                                            crate::log("WebGlContext lost");
+                                        }
+        ).expect("webglcontextlost event listener registered");
+        self.context_lost_ev = Some(ev);
     }
 
     /// Initialize the callback for a context restored event
-    fn init_on_context_restored(&self)
+    fn init_on_context_restored(&mut self)
     {
         let callback =
             {
-                clone!(self.canvas, self.context, self.gl_objects, self.valid_context);
-                Closure::wrap(Box::new(move |_event: web_sys::WebGlContextEvent|
+                clone!(self.canvas, self.context, self.valid_context, self.gl_objects);
+                move |_event: web_sys::WebGlContextEvent|
                     {
                         let mut context = context.borrow_mut();
                         // Update context
@@ -113,11 +122,12 @@ impl RenderLoop
                         }
 
                         *valid_context.borrow_mut() = true;
+                        crate::log("WebGlContext restored");
                     }
-                ) as Box<dyn FnMut(_)>)
             };
-        self.canvas.add_event_listener_with_callback("webglcontextrestored", callback.as_ref().unchecked_ref()).expect("webglcontextrestored event listener added");
-        callback.forget();
+        let ev = EventListener::new(&self.canvas, "webglcontextrestored", callback)
+            .expect("webglcontextrestored event listener registered");
+        self.context_restored_ev = Some(ev);
     }
 
     /// Starts the render loop

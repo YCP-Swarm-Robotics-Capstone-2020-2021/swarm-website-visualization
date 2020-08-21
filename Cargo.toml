@@ -36,7 +36,9 @@ features = [
     'Element',
     'Window',
     'HtmlCanvasElement',
+    'Event',
     'KeyboardEvent',
+    'MouseEvent',
 
     # WebGL stuff
     'WebGl2RenderingContext',

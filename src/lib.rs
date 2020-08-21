@@ -45,11 +45,13 @@ use cgmath::
     vec3,
     Vector4
 };
+use crate::input::listener::EventListener;
 
 #[macro_use]
 mod redeclare;
 
 mod gfx;
+mod input;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -170,8 +172,6 @@ pub fn main() -> Result<(), JsValue>
 
                     va.borrow().bind();
                     context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
-                    log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
-
                 }
         };
 
@@ -180,25 +180,28 @@ pub fn main() -> Result<(), JsValue>
     //render_loop.borrow_mut().start().unwrap();
 
     {
-        let render_loop = render_loop.clone();
-
-        let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
-            log_s(event.key());
-            if event.key() == "1"
+        clone!(context, render_loop);
+        let callback = move |event: web_sys::KeyboardEvent|
             {
-                render_loop.borrow_mut().start().expect("render loop started");
-            }
-            else if event.key() == "2"
-            {
-                render_loop.borrow_mut().pause().expect("render loop paused");
-            }
-            else if event.key() == "3"
-            {
-                render_loop.borrow_mut().cleanup();
-            }
-        }) as Box<dyn FnMut(_)>);
-        canvas.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;
-        closure.forget();
+                log_s(event.key());
+                if event.key() == "1"
+                {
+                    render_loop.borrow_mut().start().expect("render loop started");
+                }
+                else if event.key() == "2"
+                {
+                    render_loop.borrow_mut().pause().expect("render loop paused");
+                    borrow!(context);
+                    context.clear_color(0.0, 0.0, 0.0, 1.0);
+                    context.clear(Context::COLOR_BUFFER_BIT);
+                }
+                else if event.key() == "3"
+                {
+                    render_loop.borrow_mut().cleanup();
+                }
+            };
+        let ev = EventListener::new(&canvas, "keydown", callback).expect("event listener registered");
+        ev.forget();
     }
 
     Ok(())
