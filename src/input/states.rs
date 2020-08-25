@@ -1,7 +1,7 @@
 use std::
 {
     hash::BuildHasherDefault,
-    collections::{HashMap, hash_map::Entry},
+    collections::HashMap,
     rc::Rc,
     cell::{Cell, RefCell},
 };
@@ -9,7 +9,7 @@ use twox_hash::XxHash32;
 use wasm_bindgen::JsValue;
 use crate::input::listener::EventListener;
 
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Ord, Eq, Hash)]
 pub enum InputState
 {
     /// Key/Button is not pressed
@@ -21,7 +21,7 @@ pub enum InputState
 }
 
 /// Stores current states from user key and mouse input
-pub struct InputStates
+pub struct InputStateListener
 {
     target: web_sys::EventTarget,
     listeners: Vec<EventListener>,
@@ -33,11 +33,11 @@ pub struct InputStates
     last_mouse_pos: Rc<Cell<(i32, i32)>>
 }
 
-impl InputStates
+impl InputStateListener
 {
-    pub fn new(target: &web_sys::EventTarget) -> Result<InputStates, JsValue>
+    pub fn new(target: &web_sys::EventTarget) -> Result<InputStateListener, JsValue>
     {
-        let mut manager = InputStates
+        let mut manager = InputStateListener
         {
             target: target.clone(),
             listeners: Vec::with_capacity(5),
@@ -121,7 +121,7 @@ impl InputStates
     }
 
     /// Get the current state of `key`
-    pub fn key_state(&self, key: &String) -> InputState
+    pub fn key_state(&self, key: &str) -> InputState
     {
         // If `key` is not in the internal hashmap, it has not
         // been pressed yet since it would otherwise have been entered

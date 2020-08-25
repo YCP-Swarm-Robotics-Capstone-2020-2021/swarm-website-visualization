@@ -19,6 +19,12 @@ use std::
     boxed::Box,
 };
 
+#[macro_use]
+mod redeclare;
+
+mod gfx;
+mod input;
+
 use crate::
 {
     gfx::
@@ -36,6 +42,11 @@ use crate::
         vertex_array::{AttribPointer, VertexArray},
         buffer::Buffer,
         transform::Transformation,
+    },
+    input::
+    {
+        listener::EventListener,
+        states::{InputState, InputStateListener}
     }
 };
 use cgmath::
@@ -45,13 +56,6 @@ use cgmath::
     vec3,
     Vector4
 };
-use crate::input::listener::EventListener;
-
-#[macro_use]
-mod redeclare;
-
-mod gfx;
-mod input;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -155,9 +159,11 @@ pub fn main() -> Result<(), JsValue>
         vec![shaderprog.clone(), uniform_buffer.clone(), va.clone()]
     ));
 
+    let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
+
     let render_func =
         {
-            clone!(context, transformation, uniform_buffer);
+            clone!(context, transformation, uniform_buffer, input_listener);
 
             move ||
                 {
@@ -172,6 +178,11 @@ pub fn main() -> Result<(), JsValue>
 
                     va.borrow().bind();
                     context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
+
+                    if input_listener.key_state("a") == InputState::Down || input_listener.key_state("a") == InputState::Repeating
+                    {
+                        crate::log("Key 'a' is down");
+                    }
                 }
         };
 
@@ -183,7 +194,6 @@ pub fn main() -> Result<(), JsValue>
         clone!(context, render_loop);
         let callback = move |event: web_sys::KeyboardEvent|
             {
-                log_s(event.key());
                 if event.key() == "1"
                 {
                     render_loop.borrow_mut().start().expect("render loop started");
