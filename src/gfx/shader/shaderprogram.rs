@@ -89,12 +89,12 @@ impl ShaderProgram
 
         let vert = if let Some(src) = &self.vert_src
         {
-            Some(self.compile_shader(src, ShaderType::VertexShader)?)
+            Some(self.compile_shader(src.as_str(), ShaderType::VertexShader)?)
         } else { None };
 
         let frag = if let Some(src) = &self.frag_src
         {
-            Some(self.compile_shader(src, ShaderType::FragmentShader)?)
+            Some(self.compile_shader(src.as_str(), ShaderType::FragmentShader)?)
         } else { None };
 
         self.context.link_program(&self.internal);
@@ -114,11 +114,11 @@ impl ShaderProgram
     }
 
     /// Compiles a shader fragment
-    fn compile_shader(&self, src: &String, shader_type: ShaderType) -> Result<WebGlShader, GfxError>
+    fn compile_shader(&self, src: &str, shader_type: ShaderType) -> Result<WebGlShader, GfxError>
     {
         let shader = self.context.create_shader(shader_type.into())
             .ok_or(GfxError::ShaderCreationError(shader_type, gl_get_errors(&self.context).to_string()))?;
-        self.context.shader_source(&shader, &src.as_str());
+        self.context.shader_source(&shader, &src);
         self.context.compile_shader(&shader);
         self.context.attach_shader(&self.internal, &shader);
 
