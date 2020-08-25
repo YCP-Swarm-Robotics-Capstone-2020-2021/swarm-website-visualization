@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use web_sys::{WebGlBuffer};
 use crate::gfx::
 {
@@ -14,7 +13,7 @@ struct RangeBinding(u32, i32, i32);
 pub struct Buffer
 {
     internal: WebGlBuffer,
-    context: Rc<Context>,
+    context: Context,
     buffer_type: u32,
     draw_type: u32,
     buffer: Vec<u8>,
@@ -39,12 +38,12 @@ impl Buffer
         context.create_buffer().ok_or_else(|| GfxError::BufferCreationError(gl_get_errors(context).to_string()))
     }
 
-    pub fn new(context: &Rc<Context>, buffer_type: u32) -> Result<Buffer, GfxError>
+    pub fn new(context: &Context, buffer_type: u32) -> Result<Buffer, GfxError>
     {
         Ok(Buffer
         {
             internal: Buffer::new_buffer(&context)?,
-            context: Rc::clone(&context),
+            context: context.clone(),
             buffer_type,
             draw_type: 0,
             buffer: vec![],
@@ -106,9 +105,9 @@ impl GlObject for Buffer
     {
         self.context.bind_buffer(self.buffer_type, None);
     }
-    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
+    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
     {
-        self.context = Rc::clone(&context);
+        self.context = context.clone();
         self.internal = Buffer::new_buffer(&self.context)?;
         Ok(())
     }

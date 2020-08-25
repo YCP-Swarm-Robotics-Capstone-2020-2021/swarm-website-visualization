@@ -1,6 +1,5 @@
 //! All things graphics related
 
-use std::rc::Rc;
 use gen_vec::Index;
 use crate::gfx::shader::shaderprogram::ShaderType;
 
@@ -126,14 +125,14 @@ pub fn gl_get_errors(context: &Context) -> GfxError
 /// Gets a new context from the canvas
 /// Returns the Context within an Rc to allow the context to be stored and referenced
 /// by GlObjects
-pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Rc<Context>, &'static str>
+pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Context, &'static str>
 {
     match canvas.get_context("webgl2")
     {
         Ok(Some(context)) =>
             {
                 use wasm_bindgen::JsCast;
-                Ok(Rc::new(context.dyn_into::<Context>().or(Err("failed to cast webgl2 context into WebGl2RenderingContext"))?))
+                Ok(context.dyn_into::<Context>().or(Err("failed to cast webgl2 context into WebGl2RenderingContext"))?)
             },
         _ => Err("failed to get webgl2 context from canvas")
     }

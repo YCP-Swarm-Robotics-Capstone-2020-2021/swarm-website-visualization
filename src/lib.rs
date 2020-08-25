@@ -19,6 +19,12 @@ use std::
     boxed::Box,
 };
 
+#[macro_use]
+mod redeclare;
+
+mod gfx;
+mod input;
+
 use crate::
 {
     gfx::
@@ -36,6 +42,12 @@ use crate::
         vertex_array::{AttribPointer, VertexArray},
         buffer::Buffer,
         transform::Transformation,
+    },
+    input::
+    {
+        input_consts::*,
+        listener::EventListener,
+        states::{InputState, InputStateListener},
     }
 };
 use cgmath::
@@ -45,11 +57,6 @@ use cgmath::
     vec3,
     Vector4
 };
-
-#[macro_use]
-mod redeclare;
-
-mod gfx;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -75,12 +82,12 @@ pub fn main() -> Result<(), JsValue>
     #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let window: Rc<Window> = Rc::new(window().expect("window context"));
+    let window: Window = window().expect("window context");
     let document: Document = window.document().expect("document context");
     let canvas =
         {
             let elem = document.get_element_by_id("canvas").expect("canvas handle");
-            Rc::new(elem.dyn_into::<HtmlCanvasElement>()?)
+            elem.dyn_into::<HtmlCanvasElement>()?
         };
     let context = new_context(&canvas)?;
 
@@ -137,24 +144,14 @@ pub fn main() -> Result<(), JsValue>
     let buff: &[f32; 3] = color.as_ref();
     uniform_buffer.buffer_frag_data(buff);
 
-    va.bind();
-    context.clear_color(0.0, 0.0, 0.0, 1.0);
-    context.clear(Context::COLOR_BUFFER_BIT);
-    context.draw_elements_with_i32(Context::TRIANGLES, indices.len() as i32, Context::UNSIGNED_INT, 0);
-
-    log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
-
-    //let transformation = Rc::new(RefCell::new(transformation));
-    /*let shaderprog = Rc::new(RefCell::new(shaderprog));
-    let uniform_buffer = Rc::new(RefCell::new(uniform_buffer));
-    let va = Rc::new(RefCell::new(va));*/
+    crate::log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
     wrap!(transformation, shaderprog, uniform_buffer, va);
 
     // Context container so the context can be updated from within the restored callback
     // First Rc is to allow the container to be cloned and then moved into the callback
     // RefCell is for interior mutability
-    let context: Rc<RefCell<Rc<Context>>> = Rc::new(RefCell::new(context));
+    let context: Rc<RefCell<Context>> = Rc::new(RefCell::new(context));
 
     // I feel like this is overly complicated, but I'm not sure of a better way to maintain
     // a vector of things that need to be reloaded while allowing them to be used
@@ -163,9 +160,11 @@ pub fn main() -> Result<(), JsValue>
         vec![shaderprog.clone(), uniform_buffer.clone(), va.clone()]
     ));
 
+    let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
+
     let render_func =
         {
-            clone!(context, transformation, uniform_buffer);
+            clone!(context, transformation, uniform_buffer, input_listener);
 
             move ||
                 {
@@ -177,34 +176,48 @@ pub fn main() -> Result<(), JsValue>
                     let context = context.borrow();
                     context.clear_color(0.0, 0.0, 0.0, 1.0);
                     context.clear(Context::COLOR_BUFFER_BIT);
+
+                    va.borrow().bind();
                     context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
+
+                    let state = input_listener.key_state(Key_a);
+                    if state == InputState::Down
+                    {
+                        crate::log("Key 'a' is down");
+                    }
+                    else if state == InputState::Repeating
+                    {
+                        crate::log("Key 'a' is repeating");
+                    }
                 }
         };
 
 
     let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &globjects, render_func).expect("render_loop")));
-    render_loop.borrow_mut().start().unwrap();
+    //render_loop.borrow_mut().start().unwrap();
 
     {
-        let render_loop = render_loop.clone();
-
-        let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
-            log_s(event.key());
-            if event.key() == "1"
+        clone!(context, render_loop);
+        let callback = move |event: web_sys::KeyboardEvent|
             {
-                render_loop.borrow_mut().start().expect("render loop started");
-            }
-            else if event.key() == "2"
-            {
-                render_loop.borrow_mut().pause().expect("render loop paused");
-            }
-            else if event.key() == "3"
-            {
-                render_loop.borrow_mut().cleanup();
-            }
-        }) as Box<dyn FnMut(_)>);
-        canvas.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;
-        closure.forget();
+                if event.key() == Key_1
+                {
+                    render_loop.borrow_mut().start().expect("render loop started");
+                }
+                else if event.key() == Key_2
+                {
+                    render_loop.borrow_mut().pause().expect("render loop paused");
+                    borrow!(context);
+                    context.clear_color(0.0, 0.0, 0.0, 1.0);
+                    context.clear(Context::COLOR_BUFFER_BIT);
+                }
+                else if event.key() == Key_3
+                {
+                    render_loop.borrow_mut().cleanup();
+                }
+            };
+        let ev = EventListener::new(&canvas, "keydown", callback).expect("event listener registered");
+        ev.forget();
     }
 
     Ok(())

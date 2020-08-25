@@ -17,7 +17,6 @@ use std::
             Ordering,
         }
     },
-    rc::Rc,
 };
 // THIS VARIABLE MUST NEVER BE CHANGED OUTSIDE OF `get_alignment`
 // Using it in this way to cache the uniform buffer alignment is thread-safe as long
@@ -64,7 +63,7 @@ pub struct UniformBuffer
 
 impl UniformBuffer
 {
-    pub fn new(context: &Rc<Context>, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<UniformBuffer, GfxError>
+    pub fn new(context: &Context, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<UniformBuffer, GfxError>
     {
         let vert_size = align(&context, vert_size);
         // not necessary to align frag size since it isn't used as an offset
@@ -147,7 +146,7 @@ impl GlObject for UniformBuffer
 {
     fn bind(&self) { self.buffer.bind(); }
     fn unbind(&self) { self.buffer.unbind(); }
-    fn recreate(&mut self, context: &Rc<Context>) -> Result<(), GfxError>
+    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.buffer.recreate(&context)
     }
