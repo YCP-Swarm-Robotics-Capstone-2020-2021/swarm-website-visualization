@@ -21,6 +21,9 @@ pub enum InputState
 }
 
 /// Stores current states from user key and mouse input
+/// This should NOT be used to replace an on<*> event listener,
+/// this is just for being able to query the current input state
+/// of a keyboard/mouse
 pub struct InputStateListener
 {
     target: web_sys::EventTarget,

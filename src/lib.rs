@@ -45,8 +45,9 @@ use crate::
     },
     input::
     {
+        input_consts::*,
         listener::EventListener,
-        states::{InputState, InputStateListener}
+        states::{InputState, InputStateListener},
     }
 };
 use cgmath::
@@ -179,9 +180,14 @@ pub fn main() -> Result<(), JsValue>
                     va.borrow().bind();
                     context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
 
-                    if input_listener.key_state("a") == InputState::Down || input_listener.key_state("a") == InputState::Repeating
+                    let state = input_listener.key_state(Key_a);
+                    if state == InputState::Down
                     {
                         crate::log("Key 'a' is down");
+                    }
+                    else if state == InputState::Repeating
+                    {
+                        crate::log("Key 'a' is repeating");
                     }
                 }
         };
@@ -194,18 +200,18 @@ pub fn main() -> Result<(), JsValue>
         clone!(context, render_loop);
         let callback = move |event: web_sys::KeyboardEvent|
             {
-                if event.key() == "1"
+                if event.key() == Key_1
                 {
                     render_loop.borrow_mut().start().expect("render loop started");
                 }
-                else if event.key() == "2"
+                else if event.key() == Key_2
                 {
                     render_loop.borrow_mut().pause().expect("render loop paused");
                     borrow!(context);
                     context.clear_color(0.0, 0.0, 0.0, 1.0);
                     context.clear(Context::COLOR_BUFFER_BIT);
                 }
-                else if event.key() == "3"
+                else if event.key() == Key_3
                 {
                     render_loop.borrow_mut().cleanup();
                 }
