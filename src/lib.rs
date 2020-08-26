@@ -17,6 +17,7 @@ use std::
     rc::Rc,
     cell::RefCell,
     boxed::Box,
+    time::{Duration, SystemTime, UNIX_EPOCH}
 };
 
 #[macro_use]
@@ -161,15 +162,48 @@ pub fn main() -> Result<(), JsValue>
     ));
 
     let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
-
     let render_func =
         {
             clone!(context, transformation, uniform_buffer, input_listener);
+            let mut dir: f32 = 1.0;
+            let speed: f32 = 1.0;
+            let performance = window.performance().expect("performance");
+            let mut last_time: Duration = Duration::new(0, 0);
 
             move ||
                 {
+                    if last_time.as_secs() == 0
+                    {
+                        last_time = time(&performance);
+                    }
+                    let now_time = time(&performance);
+                    let elapsed_time = now_time - last_time;
+                    last_time = now_time;
+                    let elapsed_time = elapsed_time.as_secs_f32();
+
                     borrow_mut!(transformation, uniform_buffer);
 
+                    transformation.global.translate(&vec3(speed * elapsed_time * dir, 0.0, 0.0));
+
+                    let translation =
+                        {
+                            let mut t = transformation.global.get_translation().clone();
+                            if dir == -1.0
+                            {
+                                t.x = f32::max(-0.5, t.x);
+                            }
+                            else if dir == 1.0
+                            {
+                                t.x = f32::min(0.5, t.x);
+                            }
+                            t
+                        };
+
+                    transformation.global.set_translation(translation);
+                    if transformation.translation().x <= -0.5 || transformation.translation().x >= 0.5
+                    {
+                        dir *= -1.0;
+                    }
                     let buff: &[f32; 16] = transformation.matrix().as_ref();
                     uniform_buffer.buffer_vert_data(buff);
 
@@ -221,4 +255,13 @@ pub fn main() -> Result<(), JsValue>
     }
 
     Ok(())
+}
+
+/// From https://rustwasm.github.io/docs/wasm-bindgen/examples/performance.html
+fn time(performance: &web_sys::Performance) -> Duration
+{
+    let perf = performance.now();
+    let secs = (perf as u64) / 1_000;
+    let nanos = ((perf as u32) % 1_000) * 1_000_000;
+    Duration::new(secs, nanos)
 }
