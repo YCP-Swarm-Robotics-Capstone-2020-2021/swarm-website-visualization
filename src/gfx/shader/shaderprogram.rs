@@ -193,12 +193,18 @@ impl GlObject for ShaderProgram
     {
         self.bind();
 
+        // Restore all block bindings
         for (block_binding, block_name) in self.block_bindings.to_owned().iter().enumerate()
         {
             if let Some(block_name) = block_name
             {
                 self.add_uniform_block_binding(block_name.as_str(), block_binding as u32)?;
             }
+        }
+        // Restore i32 uniforms
+        for (name, value) in self.uniforms_i32.to_owned()
+        {
+            self.set_uniform_i32(&name, &value)?;
         }
 
         Ok(())

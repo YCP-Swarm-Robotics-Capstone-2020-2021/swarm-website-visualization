@@ -26,6 +26,8 @@ pub enum GfxError
     ShaderProgramLinkingError(String),
     /// Invalid block name for uniform buffer binding
     InvalidUniformBlockName(String),
+    /// Invalid name for a regular uniform variable
+    InvalidUniformName(String),
 
     /// Error creating a new buffer
     BufferCreationError(String),
