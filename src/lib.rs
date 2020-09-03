@@ -25,6 +25,7 @@ mod redeclare;
 
 mod gfx;
 mod input;
+mod math;
 
 use crate::
 {
@@ -42,14 +43,14 @@ use crate::
         },
         vertex_array::{AttribPointer, VertexArray},
         buffer::Buffer,
-        transform::Transformation,
     },
     input::
     {
         input_consts::*,
         listener::EventListener,
         states::{InputState, InputStateListener},
-    }
+    },
+    math::transform::{Transformation, SubTransformation},
 };
 use cgmath::
 {
@@ -96,7 +97,6 @@ pub fn main() -> Result<(), JsValue>
         ShaderProgram::new(&context, Some(shadersrc::BASIC_VERT.to_string()), Some(shadersrc::BASIC_FRAG.to_string()))
             .expect("shader program");
     shaderprog.bind();
-
     // Triangle point data
     let triangle: [f32; 9] =
         [
