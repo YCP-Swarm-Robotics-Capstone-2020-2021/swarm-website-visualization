@@ -24,11 +24,10 @@ wee_alloc = { version = "0.4.5", optional = true }
 lazy_static = "1.4.0"
 gen-vec = "0.3.0"
 paste = "1.0.0"
-
 cgmath = "0.17"
 js-sys = "0.3"
-
 twox-hash = "1.5.0"
+memoffset = "0.5"
 
 [dependencies.web-sys]
 version = "0.3"
