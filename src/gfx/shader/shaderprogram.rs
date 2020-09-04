@@ -1,4 +1,11 @@
 use web_sys::{WebGlProgram, WebGlShader};
+use twox_hash::XxHash32;
+use std::
+{
+    any::{Any, TypeId},
+    hash::BuildHasherDefault,
+    collections::HashMap,
+};
 use crate::gfx::
 {
     Context,
@@ -56,6 +63,7 @@ pub struct ShaderProgram
     frag_src: Option<String>,
     // Indexed by block binding, holds block names
     block_bindings: Vec<Option<String>>,
+    uniforms_i32: HashMap<String, Vec<i32>, BuildHasherDefault<XxHash32>>
 }
 
 impl ShaderProgram
@@ -77,7 +85,8 @@ impl ShaderProgram
             context: context.clone(),
             vert_src: vert_src,
             frag_src: frag_src,
-            block_bindings: vec![]
+            block_bindings: vec![],
+            uniforms_i32: Default::default(),
         };
         program.compile()?;
         Ok(program)
@@ -117,7 +126,7 @@ impl ShaderProgram
     fn compile_shader(&self, src: &str, shader_type: ShaderType) -> Result<WebGlShader, GfxError>
     {
         let shader = self.context.create_shader(shader_type.into())
-            .ok_or(GfxError::ShaderCreationError(shader_type, gl_get_errors(&self.context).to_string()))?;
+            .ok_or_else(|| GfxError::ShaderCreationError(shader_type, gl_get_errors(&self.context).to_string()))?;
         self.context.shader_source(&shader, &src);
         self.context.compile_shader(&shader);
         self.context.attach_shader(&self.internal, &shader);
@@ -154,6 +163,19 @@ impl ShaderProgram
             Ok(())
         }
     }
+
+    // TODO: Add more set_uniform functions as necessary
+
+    /// Set the uniform with `name` to `value`
+    /// If `name` is a scalar, then give a one element slice. i.e. `&[5]`
+    pub fn set_uniform_i32(&mut self, name: &str, value: &[i32]) -> Result<(), GfxError>
+    {
+        let location = self.context.get_uniform_location(&self.internal, name).ok_or_else(|| GfxError::InvalidUniformName(name.to_string()))?;
+        self.context.uniform1iv_with_i32_array(Some(&location), value);
+        self.uniforms_i32.insert(name.to_string(), value.to_vec());
+        Ok(())
+    }
+
 }
 
 impl GlObject for ShaderProgram
@@ -171,12 +193,18 @@ impl GlObject for ShaderProgram
     {
         self.bind();
 
+        // Restore all block bindings
         for (block_binding, block_name) in self.block_bindings.to_owned().iter().enumerate()
         {
             if let Some(block_name) = block_name
             {
                 self.add_uniform_block_binding(block_name.as_str(), block_binding as u32)?;
             }
+        }
+        // Restore i32 uniforms
+        for (name, value) in self.uniforms_i32.to_owned()
+        {
+            self.set_uniform_i32(&name, &value)?;
         }
 
         Ok(())
