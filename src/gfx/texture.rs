@@ -40,24 +40,29 @@ impl Texture
             params
         };
 
-        context.bind_texture(texture.params.target, Some(&texture.internal));
-        context.tex_parameteri(texture.params.target, Context::TEXTURE_WRAP_S, texture.params.wrap_type as i32);
-        context.tex_parameteri(texture.params.target, Context::TEXTURE_WRAP_T, texture.params.wrap_type as i32);
-        context.tex_parameteri(texture.params.target, Context::TEXTURE_MIN_FILTER, texture.params.filter_type as i32);
-        context.tex_parameteri(texture.params.target, Context::TEXTURE_MAG_FILTER, texture.params.filter_type as i32);
-        context.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
-            texture.params.target,
-            0,
-            texture.params.format as i32,
-            texture.params.size.0,
-            texture.params.size.1,
-            0,
-            texture.params.format,
-            Context::UNSIGNED_BYTE,
-            Some(texture.params.data.as_slice())
-        ).or_else(|_| Err(GfxError::TextureCreationError(gl_get_errors(&context).to_string())))?;
+        texture.fill_texture()?;
 
         Ok(texture)
+    }
+
+    fn fill_texture(&self) -> Result<(), GfxError>
+    {
+        self.context.bind_texture(self.params.target, Some(&self.internal));
+        self.context.tex_parameteri(self.params.target, Context::TEXTURE_WRAP_S, self.params.wrap_type as i32);
+        self.context.tex_parameteri(self.params.target, Context::TEXTURE_WRAP_T, self.params.wrap_type as i32);
+        self.context.tex_parameteri(self.params.target, Context::TEXTURE_MIN_FILTER, self.params.filter_type as i32);
+        self.context.tex_parameteri(self.params.target, Context::TEXTURE_MAG_FILTER, self.params.filter_type as i32);
+        self.context.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
+            self.params.target,
+            0,
+            self.params.format as i32,
+            self.params.size.0,
+            self.params.size.1,
+            0,
+            self.params.format,
+            Context::UNSIGNED_BYTE,
+            Some(self.params.data.as_slice())
+        ).or_else(|_| Err(GfxError::TextureCreationError(gl_get_errors(&self.context).to_string())))
     }
 }
 
@@ -69,13 +74,14 @@ impl GlObject for Texture
 
     fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
     {
-        *self = Texture::new(&context, self.params.clone())?;
+        self.context = context.clone();
+        self.internal = Texture::new_texture(&context, self.params.target)?;
         Ok(())
     }
 
     fn reload(&mut self) -> Result<(), GfxError>
     {
-        Ok(())
+        self.fill_texture()
     }
 }
 
