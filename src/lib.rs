@@ -22,6 +22,8 @@ use std::
 
 #[macro_use]
 mod redeclare;
+#[macro_use]
+extern crate memoffset;
 
 mod gfx;
 mod input;
@@ -43,6 +45,8 @@ use crate::
         },
         vertex_array::{AttribPointer, VertexArray},
         buffer::Buffer,
+        texture::Texture,
+        renderer::{vertex::Vertex}
     },
     input::
     {
@@ -59,6 +63,7 @@ use cgmath::
     vec3,
     Vector4
 };
+use crate::gfx::texture::TextureParams;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -94,15 +99,29 @@ pub fn main() -> Result<(), JsValue>
     let context = new_context(&canvas)?;
 
     let mut shaderprog =
-        ShaderProgram::new(&context, Some(shadersrc::BASIC_VERT.to_string()), Some(shadersrc::BASIC_FRAG.to_string()))
+        ShaderProgram::new(&context, Some(shadersrc::TEXTURE_VERT.to_string()), Some(shadersrc::TEXTURE_FRAG.to_string()))
             .expect("shader program");
     shaderprog.bind();
+    shaderprog.set_uniform_i32("tex", &[0]);
+    let tex = Texture::new(&context, TextureParams
+    {
+        target: Context::TEXTURE_2D,
+        format: Context::RGBA,
+        size: (1, 1),
+        wrap_type: Context::REPEAT,
+        filter_type: Context::NEAREST,
+        //data: vec![255, 0, 0, 255]
+        //data: vec![(253.0f32/255.0f32) as u8, (94.0f32/255.0f32) as u8, 0, 255]
+        data: vec![253.0 as u8, 94.0 as u8, 0, 255]
+    }).expect("texture");
+    context.active_texture(Context::TEXTURE0);
+    tex.bind();
     // Triangle point data
-    let triangle: [f32; 9] =
+    let triangle =
         [
-            -0.5, -0.5,  0.0,
-            0.5, -0.5,  0.0,
-            0.0,  0.5,  0.0
+            Vertex { pos: [-0.5, -0.5, 0.0], tex: [0.0, 0.0] },
+            Vertex { pos: [ 0.5, -0.5, 0.0], tex: [1.0, 0.0] },
+            Vertex { pos: [ 0.0,  0.5, 0.0], tex: [0.5, 1.0] }
         ];
     // Triangle point order
     let indices: [u32; 3] = [0, 1, 2];
@@ -112,8 +131,13 @@ pub fn main() -> Result<(), JsValue>
 
     let mut vb = Buffer::new(&context, Context::ARRAY_BUFFER).expect("array buffer");
     vb.bind();
+
     vb.buffer_data(&triangle, Context::STATIC_DRAW);
-    let _vb = va.add_buffer(vb, Some(vec![AttribPointer::with_defaults::<f32>(0, 3, Context::FLOAT, 0)]));
+    let attribs = vec![
+        AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, pos) as i32),
+        AttribPointer::without_defaults(1, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, tex) as i32),
+    ];
+    let _vb = va.add_buffer(vb, Some(attribs));
 
     let mut eb = Buffer::new(&context, Context::ELEMENT_ARRAY_BUFFER).expect("element array buffer");
     eb.bind();
@@ -129,25 +153,21 @@ pub fn main() -> Result<(), JsValue>
         std::mem::size_of::<Matrix4<f32>>() as i32,
         // Needs to be Vector4 even though its actually a Vector3
         // Using 3 element vectors with google chrome causes issues
-        std::mem::size_of::<Vector4<f32>>() as i32,
+        0,
         Context::STATIC_DRAW
     ).expect("uniform buffer handle");
     uniform_buffer.bind();
 
     uniform_buffer.add_vert_block(&mut shaderprog, "VertData").expect("VertData bound");
-    uniform_buffer.add_frag_block(&mut shaderprog, "FragData").expect("FragData bound");
+
 
     transformation.global.translate(&vec3(-0.5, 0.0, 0.0));
     let buff: &[f32; 16] = transformation.matrix().as_ref();
     uniform_buffer.buffer_vert_data(buff);
 
-    let color: Vector3<f32> = vec3(253.0/255.0, 94.0/255.0, 0.0);
-    let buff: &[f32; 3] = color.as_ref();
-    uniform_buffer.buffer_frag_data(buff);
-
     crate::log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
-    wrap!(transformation, shaderprog, uniform_buffer, va);
+    wrap!(transformation, shaderprog, uniform_buffer, va, tex);
 
     // Context container so the context can be updated from within the restored callback
     // First Rc is to allow the container to be cloned and then moved into the callback
@@ -158,7 +178,7 @@ pub fn main() -> Result<(), JsValue>
     // a vector of things that need to be reloaded while allowing them to be used
     // without accessing them through the vector
     let globjects: Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>> = Rc::new(RefCell::new(
-        vec![shaderprog.clone(), uniform_buffer.clone(), va.clone()]
+        vec![shaderprog.clone(), uniform_buffer.clone(), va.clone(), tex.clone()]
     ));
 
     let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));

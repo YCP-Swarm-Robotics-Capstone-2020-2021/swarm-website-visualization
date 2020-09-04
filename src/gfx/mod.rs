@@ -35,6 +35,9 @@ pub enum GfxError
     /// Error creating a new vertex array
     VertexArrayCreationError(String),
 
+    /// Error creating a new texture
+    TextureCreationError(String),
+
     RenderLoopAlreadyRunning,
     RenderLoopNotRunning,
     RenderLoopAlreadyCleanedUp,
@@ -146,3 +149,4 @@ pub mod vertex_array;
 pub mod buffer;
 pub mod render_loop;
 pub mod renderer;
+pub mod texture;
