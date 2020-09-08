@@ -24,6 +24,8 @@ use std::
 mod redeclare;
 #[macro_use]
 extern crate memoffset;
+#[macro_use]
+extern crate downcast_rs;
 
 mod gfx;
 mod input;
@@ -36,7 +38,6 @@ use crate::
         Context,
         new_context,
         render_loop::RenderLoop,
-        gl_object::GlObject,
         shader::
         {
             shaderprogram::ShaderProgram,
@@ -86,7 +87,7 @@ fn log_s(s: String)
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue>
 {
-    #[cfg(feature="debug")]
+    /*#[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     let window: Window = window().expect("window context");
@@ -272,7 +273,7 @@ pub fn main() -> Result<(), JsValue>
             };
         let ev = EventListener::new(&canvas, "keydown", callback).expect("event listener registered");
         ev.forget();
-    }
+    }*/
 
     Ok(())
 }

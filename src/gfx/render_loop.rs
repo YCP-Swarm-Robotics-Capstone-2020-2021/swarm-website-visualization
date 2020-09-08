@@ -109,7 +109,7 @@ impl RenderLoop
                         // Recreate and reload all given GlObjects with new context
                         for obj in gl_objects.borrow().iter()
                         {
-                            obj.borrow_mut().recreate_and_reload(&context).expect("GlObject recreated and reloaded");
+                            obj.borrow_mut().reload(&context).expect("GlObject recreated and reloaded");
                         }
 
                         // Print out any webgl errors

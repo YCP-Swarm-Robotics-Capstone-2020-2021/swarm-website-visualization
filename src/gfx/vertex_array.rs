@@ -132,19 +132,15 @@ impl GlObject for VertexArray
     {
         self.context.bind_vertex_array(None);
     }
-    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = VertexArray::new_vertex_array(&self.context)?;
-        Ok(())
-    }
-    fn reload(&mut self) -> Result<(), GfxError>
-    {
         self.bind();
 
         for index in self.allocator.iter()
         {
-            self.buffers.get_mut(index).ok_or_else(|| GfxError::InvalidHandle(index))?.recreate_and_reload(&self.context)?;
+            self.buffers.get_mut(index).ok_or_else(|| GfxError::InvalidHandle(index))?.reload(&self.context)?;
             if let Some(attrib_ptrs) = self.attrib_ptrs.get(index).ok_or_else(|| GfxError::InvalidHandle(index))?
             {
                 self.set_attrib_ptrs(&attrib_ptrs);

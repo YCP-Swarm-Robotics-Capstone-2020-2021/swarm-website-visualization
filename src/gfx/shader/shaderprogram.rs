@@ -182,15 +182,11 @@ impl GlObject for ShaderProgram
 {
     fn bind(&self) { self.context.use_program(Some(&self.internal)); }
     fn unbind(&self) { self.context.use_program(None); }
-    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = ShaderProgram::new_program(&self.context)?;
         self.compile()?;
-        Ok(())
-    }
-    fn reload(&mut self) -> Result<(), GfxError>
-    {
         self.bind();
 
         // Restore all block bindings

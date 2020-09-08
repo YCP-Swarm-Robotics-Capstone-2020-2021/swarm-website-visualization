@@ -5,6 +5,7 @@ use crate::gfx::
     GfxError,
     gl_get_errors,
     gl_object::GlObject,
+    manager::{GlObjectHandle, GlObjectManager},
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -53,6 +54,10 @@ impl Buffer
 
     /// Set the contents of the buffer to `data`
     /// `draw_type` is one of the webgl `*_DRAW` enum types
+    pub fn _buffer_data<T>(manager: &mut GlObjectManager, handle: GlObjectHandle, data: &[T], draw_type: u32)
+    {
+
+    }
     pub fn buffer_data<T>(&mut self, data: &[T], draw_type: u32)
     {
         self.buffer_data_raw(as_u8_slice(data), draw_type);
@@ -60,6 +65,10 @@ impl Buffer
 
     /// Set the contents of the buffer to `data`
     /// `draw_type` is one of the webgl `*_DRAW` enum types
+    pub fn _buffer_data_raw(manager: &mut GlObjectManager, handle: GlObjectHandle, data: &[u8], draw_type: u32)
+    {
+        let buffer = manager.get_mut::<Buffer>(handle);
+    }
     pub fn buffer_data_raw(&mut self, data: &[u8], draw_type: u32)
     {
         self.buffer = data.to_vec();
@@ -105,14 +114,10 @@ impl GlObject for Buffer
     {
         self.context.bind_buffer(self.buffer_type, None);
     }
-    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = Buffer::new_buffer(&self.context)?;
-        Ok(())
-    }
-    fn reload(&mut self) -> Result<(), GfxError>
-    {
         self.bind();
         self.context.buffer_data_with_u8_array(self.buffer_type, &self.buffer, self.draw_type);
 

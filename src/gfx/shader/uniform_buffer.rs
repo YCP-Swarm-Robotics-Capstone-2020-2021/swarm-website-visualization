@@ -146,13 +146,9 @@ impl GlObject for UniformBuffer
 {
     fn bind(&self) { self.buffer.bind(); }
     fn unbind(&self) { self.buffer.unbind(); }
-    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
-        self.buffer.recreate(&context)
-    }
-    fn reload(&mut self) -> Result<(), GfxError>
-    {
-        self.buffer.reload()
+        self.buffer.reload(&context)
     }
 }
 

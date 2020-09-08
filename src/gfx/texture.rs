@@ -72,15 +72,10 @@ impl GlObject for Texture
 
     fn unbind(&self) { self.context.bind_texture(self.params.target, None); }
 
-    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = Texture::new_texture(&context, self.params.target)?;
-        Ok(())
-    }
-
-    fn reload(&mut self) -> Result<(), GfxError>
-    {
         self.fill_texture()
     }
 }
