@@ -12,6 +12,7 @@ use crate::gfx::
     GfxError,
     gl_get_errors,
     gl_object::GlObject,
+    manager::{GlObjectHandle, GlObjectManager},
 };
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]

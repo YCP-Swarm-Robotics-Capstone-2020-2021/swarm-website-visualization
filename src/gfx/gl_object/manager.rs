@@ -1,13 +1,10 @@
-use gen_vec::{Index, closed::ClosedGenVec};
+use gen_vec::{Index, exposed::{IndexAllocator, ExposedGenVec}};
 use std::
 {
     collections::HashMap,
     hash::BuildHasherDefault,
-    any::
-    {
-        Any,
-        TypeId,
-    }
+    any::TypeId,
+    cell::RefCell,
 };
 use twox_hash::XxHash32;
 
@@ -15,14 +12,19 @@ use crate::gfx::
 {
     Context,
     GfxError,
-    gl_object::GlObject,
+    gl_object::traits::{GlObject, Bindable, Reloadable},
+    buffer::Buffer,
+    shader::shaderprogram::ShaderProgram,
+    texture::Texture,
+    vertex_array::VertexArray,
 };
 
 pub type GlObjectHandle = Index;
 pub struct GlObjectManager
 {
-    objects: ClosedGenVec<Box<dyn GlObject>>,
-    bound: HashMap<TypeId, Option<GlObjectHandle>, BuildHasherDefault<XxHash32>>,
+    allocator: IndexAllocator,
+    objects: ExposedGenVec<RefCell<dyn GlObject>>,
+    bound: ExposedGenVec<Option<GlObjectHandle>>,
 }
 
 impl GlObjectManager
@@ -31,8 +33,9 @@ impl GlObjectManager
     {
         GlObjectManager
         {
-            objects: ClosedGenVec::new(),
-            bound: Default::default()
+            allocator: ExposedGenVec::new(),
+            objects: ExposedGenVec::new(),
+            bound: ExposedGenVec::new(),
         }
     }
 
@@ -64,9 +67,22 @@ impl GlObjectManager
         }
     }
 
-    pub(in crate::gfx) fn bind<T>(&mut self, handle: Option<GlObjectHandle>) where T: GlObject + 'static
+/*    pub(in crate::gfx) fn bind(&mut self, handle: GlObjectHandle)
     {
-        self.bound.insert(TypeId::of::<T>(),handle);
+        if let Some(obj) = self.objects.get(handle)
+        {
+            obj.bind();
+            self.bound.insert(TypeId::of::<T>(), handle);
+        }
+    }
+
+    pub(in crate::gfx) fn unbind(&mut self, handle: GlObjectHandle)
+    {
+        if let Some(obj) = self.objects.get(handle)
+        {
+            obj.unbind();
+            self.bound.insert(TypeId::of::<T>(), None);
+        }
     }
 
     pub fn reload_objects(&mut self, context: &Context) -> Result<(), GfxError>
@@ -87,5 +103,5 @@ impl GlObjectManager
             }
         }
         Ok(())
-    }
+    }*/
 }

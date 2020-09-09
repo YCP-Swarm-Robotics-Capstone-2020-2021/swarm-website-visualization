@@ -143,8 +143,7 @@ pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Context, &'sta
     }
 }
 
-mod gl_object;
-pub mod manager;
+pub mod gl_object;
 pub mod shader;
 pub mod vertex_array;
 pub mod buffer;
