@@ -1,10 +1,15 @@
-use gen_vec::{Index, exposed::{IndexAllocator, ExposedGenVec}};
+use gen_vec::{Index, exposed::{IndexAllocator, ExposedGenVec}, closed::ClosedGenVec};
 use std::
 {
     collections::HashMap,
     hash::BuildHasherDefault,
     any::TypeId,
-    cell::RefCell,
+    cell::
+    {
+        RefCell,
+        Ref,
+        RefMut,
+    },
 };
 use twox_hash::XxHash32;
 
@@ -19,12 +24,37 @@ use crate::gfx::
     vertex_array::VertexArray,
 };
 
-pub type GlObjectHandle = Index;
+/// Different GlObjects currently available
+/// This is to be able to differentiate between
+/// the different types of Buffers and Textures
+/// that exist
+#[derive(Debug, Copy, Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub enum GlObjectType
+{
+    Buffer(u32),
+    ShaderProgram,
+    Texture(u32),
+    UniformBuffer,
+    VertexArray,
+}
+
+/// Handle to a GlObject
+pub struct GlObjectHandle
+{
+    // Handle to the type of a GlObject
+    // Used for binding and unbinding GlObject's
+    // based on type
+    type_handle: Index,
+    // Handle to the object itself
+    object_handle: Index
+}
 pub struct GlObjectManager
 {
-    allocator: IndexAllocator,
-    objects: ExposedGenVec<RefCell<dyn GlObject>>,
-    bound: ExposedGenVec<Option<GlObjectHandle>>,
+    objects: ClosedGenVec<RefCell<dyn GlObject>>,
+
+    bound_allocator: IndexAllocator,
+    bound_types: ExposedGenVec<bool>,
+    type_handles: HashMap<GlObjectType, Index, BuildHasherDefault<XxHash32>>,
 }
 
 impl GlObjectManager
@@ -33,36 +63,50 @@ impl GlObjectManager
     {
         GlObjectManager
         {
-            allocator: ExposedGenVec::new(),
             objects: ExposedGenVec::new(),
-            bound: ExposedGenVec::new(),
+            bound_allocator: ExposedGenVec::new(),
+            bound_types: ExposedGenVec::new(),
+            type_handles: Default::default(),
         }
     }
 
-    pub fn insert<T>(&mut self, obj: T) -> GlObjectHandle where T: GlObject + 'static
+    pub fn insert<T>(&mut self, obj: T, type_: GlObjectType) -> GlObjectHandle where T: GlObject + 'static
     {
-        self.objects.insert(Box::new(obj))
+        let type_handle = match self.type_handles.contains_key(&type_)
+        {
+            Some(handle) => handle,
+            None =>
+                {
+                    let handle = self.bound_allocator.allocate();
+                    self.type_handles.insert(type_, handle);
+                    handle
+                }
+        };
+        
+        let object_handle = self.objects.insert(Box::new(obj));
+
+        GlObjectHandle { type_handle, object_handle }
     }
 
     pub fn remove<T>(&mut self, handle: GlObjectHandle) where T: GlObject + 'static
     {
-        self.objects.remove(handle);
+        self.objects.remove(handle.object_handle);
     }
 
-    pub(in crate::gfx) fn get<T>(&self, handle: GlObjectHandle) -> Option<&T> where T: GlObject + 'static
+    pub(in crate::gfx) fn get<T>(&self, handle: GlObjectHandle) -> Option<Ref<T>> where T: GlObject + 'static
     {
-        match self.objects.get(handle)
+        match self.objects.get(handle.object_handle)
         {
-            Some(obj) => obj.downcast_ref::<T>(),
+            Some(obj) => Some(Ref::map(obj.borrow(), |obj| obj.downcast_ref::<T>().expect("GlObject downcast"))),
             _ => None
         }
     }
 
-    pub(in crate::gfx) fn get_mut<T>(&mut self, handle: GlObjectHandle) -> Option<&mut T> where T: GlObject + 'static
+    pub(in crate::gfx) fn get_mut<T>(&mut self, handle: GlObjectHandle) -> Option<RefMut<T>> where T: GlObject + 'static
     {
-        match self.objects.get_mut(handle)
+        match self.objects.get_mut(handle.object_handle)
         {
-            Some(obj) => obj.downcast_mut::<T>(),
+            Some(obj) => Some(RefMut::map(obj.borrow_mut(), |obj| obj.downcast_ref::<T>().expect("GlObject downcast"))),
             _ => None
         }
     }
