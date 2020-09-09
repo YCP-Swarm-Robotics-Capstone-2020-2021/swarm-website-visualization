@@ -4,8 +4,11 @@ use crate::gfx::
     Context,
     GfxError,
     gl_get_errors,
-    gl_object::GlObject,
-    manager::{GlObjectHandle, GlObjectManager},
+    gl_object::
+    {
+        manager::{GlObjectHandle, GlObjectManager},
+        traits::{GlObject, Bindable, Reloadable}
+    },
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -104,7 +107,9 @@ impl Buffer
     }
 }
 
-impl GlObject for Buffer
+impl GlObject for Buffer {}
+
+impl Bindable for Buffer
 {
     fn bind(&self)
     {
@@ -114,6 +119,10 @@ impl GlObject for Buffer
     {
         self.context.bind_buffer(self.buffer_type, None);
     }
+}
+
+impl Reloadable for Buffer
+{
     fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();

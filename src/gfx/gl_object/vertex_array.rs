@@ -5,8 +5,12 @@ use crate::gfx::
     Context,
     GfxError,
     gl_get_errors,
-    gl_object::GlObject,
-    buffer::Buffer,
+    gl_object::
+    {
+        manager::{GlObjectHandle, GlObjectManager},
+        traits::{GlObject, Bindable, Reloadable},
+        buffer::Buffer,
+    },
 };
 use web_sys::WebGlVertexArrayObject;
 use gen_vec::{Index, exposed::{IndexAllocator, ExposedGenVec}};
@@ -122,7 +126,9 @@ impl VertexArray
     }
 }
 
-impl GlObject for VertexArray
+impl GlObject for VertexArray {}
+
+impl Bindable for VertexArray
 {
     fn bind(&self)
     {
@@ -132,6 +138,10 @@ impl GlObject for VertexArray
     {
         self.context.bind_vertex_array(None);
     }
+}
+
+impl Reloadable for VertexArray
+{
     fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();

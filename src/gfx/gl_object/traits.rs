@@ -2,7 +2,7 @@
 ///
 /// All WebGl object wrappers should implement this trait
 
-use crate::gfx::gl_object::manager::{GlObjectHandle, GlObjectManager};
+use crate::gfx::gl_object::manager::{Index, GlObjectManager};
 
 pub trait Bindable
 {
@@ -19,7 +19,7 @@ pub trait Reloadable
 
 pub trait GlObject: Bindable + Reloadable + Drop + downcast_rs::Downcast
 {
-    fn bind(manager: &mut GlObjectManager, handle: GlObjectHandle) where Self: Sized { manager.bind(handle); }
-    fn unbind(manager: &mut GlObjectManager, handle: GlObjectHandle) where Self: Sized { manager.unbind(handle); }
+    fn bind(manager: &mut GlObjectManager, handle: Index) where Self: Sized { manager.bind(handle); }
+    fn unbind(manager: &mut GlObjectManager, handle: Index) where Self: Sized { manager.unbind(handle); }
 }
 impl_downcast!(GlObject);

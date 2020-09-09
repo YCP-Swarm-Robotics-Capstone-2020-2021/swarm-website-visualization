@@ -1,5 +1,15 @@
 use web_sys::WebGlTexture;
-use crate::gfx::{Context, GfxError, gl_object::GlObject, gl_get_errors};
+use crate::gfx::
+{
+    Context,
+    GfxError,
+    gl_get_errors,
+    gl_object::
+    {
+        manager::{GlObjectHandle, GlObjectManager},
+        traits::{GlObject, Bindable, Reloadable}
+    },
+};
 
 #[derive(Debug, Clone)]
 pub struct TextureParams
@@ -66,12 +76,17 @@ impl Texture
     }
 }
 
-impl GlObject for Texture
+impl GlObject for Texture {}
+
+impl Bindable for Texture
 {
     fn bind(&self) { self.context.bind_texture(self.params.target, Some(&self.internal)); }
 
     fn unbind(&self) { self.context.bind_texture(self.params.target, None); }
+}
 
+impl Reloadable for Texture
+{
     fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();

@@ -2,9 +2,13 @@ use crate::gfx::
 {
     Context,
     GfxError,
-    gl_object::GlObject,
-    buffer::Buffer,
-    shader::shaderprogram::ShaderProgram,
+    gl_object::
+    {
+        manager::{GlObjectHandle, GlObjectManager},
+        traits::{GlObject, Bindable, Reloadable},
+        buffer::Buffer,
+        shader::shaderprogram::ShaderProgram,
+    },
 };
 use std::
 {
@@ -144,8 +148,21 @@ impl UniformBuffer
 
 impl GlObject for UniformBuffer
 {
+    fn bind(manager: &mut GlObjectManager, handle: gen_vec::Index) where Self: Sized
+    {
+        let ub = manager.get::<UniformBuffer>(handle);
+        GlObject::bind(&mut manager, )
+    }
+}
+
+impl Bindable for UniformBuffer
+{
     fn bind(&self) { self.buffer.bind(); }
     fn unbind(&self) { self.buffer.unbind(); }
+}
+
+impl Reloadable for UniformBuffer
+{
     fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.buffer.reload(&context)
