@@ -80,9 +80,9 @@ impl GlObject for Texture {}
 
 impl Bindable for Texture
 {
-    fn bind(&self) { self.context.bind_texture(self.params.target, Some(&self.internal)); }
+    fn bind_internal(&self) { self.context.bind_texture(self.params.target, Some(&self.internal)); }
 
-    fn unbind(&self) { self.context.bind_texture(self.params.target, None); }
+    fn unbind_internal(&self) { self.context.bind_texture(self.params.target, None); }
 }
 
 impl Reloadable for Texture

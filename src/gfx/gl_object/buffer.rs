@@ -6,7 +6,7 @@ use crate::gfx::
     gl_get_errors,
     gl_object::
     {
-        manager::{GlObjectHandle, GlObjectManager},
+        manager::{GlObjectHandle, GlObjectManager, GlObjectType},
         traits::{GlObject, Bindable, Reloadable}
     },
 };
@@ -42,7 +42,7 @@ impl Buffer
         context.create_buffer().ok_or_else(|| GfxError::BufferCreationError(gl_get_errors(context).to_string()))
     }
 
-    pub fn new(context: &Context, buffer_type: u32) -> Result<Buffer, GfxError>
+/*    pub fn new(context: &Context, buffer_type: u32) -> Result<Buffer, GfxError>
     {
         Ok(Buffer
         {
@@ -53,14 +53,24 @@ impl Buffer
             buffer: vec![],
             range_bindings: vec![]
         })
+    }*/
+
+    pub fn new(context: &Context, manager: &mut GlObjectManager, buffer_type: u32) -> Result<GlObjectHandle, GfxError>
+    {
+        let buffer = Buffer
+        {
+            internal: Buffer::new_buffer(&context)?,
+            context: context.clone(),
+            buffer_type,
+            draw_type: 0,
+            buffer: vec![],
+            range_bindings: vec![]
+        };
+        Ok(manager.insert(buffer, GlObjectType::Buffer(buffer_type)))
     }
 
     /// Set the contents of the buffer to `data`
     /// `draw_type` is one of the webgl `*_DRAW` enum types
-    pub fn _buffer_data<T>(manager: &mut GlObjectManager, handle: GlObjectHandle, data: &[T], draw_type: u32)
-    {
-
-    }
     pub fn buffer_data<T>(&mut self, data: &[T], draw_type: u32)
     {
         self.buffer_data_raw(as_u8_slice(data), draw_type);
@@ -68,10 +78,6 @@ impl Buffer
 
     /// Set the contents of the buffer to `data`
     /// `draw_type` is one of the webgl `*_DRAW` enum types
-    pub fn _buffer_data_raw(manager: &mut GlObjectManager, handle: GlObjectHandle, data: &[u8], draw_type: u32)
-    {
-        let buffer = manager.get_mut::<Buffer>(handle);
-    }
     pub fn buffer_data_raw(&mut self, data: &[u8], draw_type: u32)
     {
         self.buffer = data.to_vec();
@@ -111,11 +117,11 @@ impl GlObject for Buffer {}
 
 impl Bindable for Buffer
 {
-    fn bind(&self)
+    fn bind_internal(&self)
     {
         self.context.bind_buffer(self.buffer_type, Some(&self.internal));
     }
-    fn unbind(&self)
+    fn unbind_internal(&self)
     {
         self.context.bind_buffer(self.buffer_type, None);
     }
@@ -127,7 +133,7 @@ impl Reloadable for Buffer
     {
         self.context = context.clone();
         self.internal = Buffer::new_buffer(&self.context)?;
-        self.bind();
+        self.bind_internal();
         self.context.buffer_data_with_u8_array(self.buffer_type, &self.buffer, self.draw_type);
 
         let range_bindings = self.range_bindings.to_owned();

@@ -6,8 +6,8 @@ use crate::gfx::gl_object::manager::{GlObjectHandle, GlObjectManager};
 
 pub trait Bindable
 {
-    fn bind(&self);
-    fn unbind(&self);
+    fn bind_internal(&self);
+    fn unbind_internal(&self);
 }
 
 pub trait Reloadable
@@ -19,7 +19,7 @@ pub trait Reloadable
 
 pub trait GlObject: Bindable + Reloadable + Drop + downcast_rs::Downcast
 {
-    fn bind(manager: &mut GlObjectManager, handle: GlObjectHandle) where Self: Sized { manager.bind(handle); }
-    fn unbind(manager: &mut GlObjectManager, handle: GlObjectHandle) where Self: Sized { manager.unbind(handle); }
+    fn bind(manager: &GlObjectManager, handle: GlObjectHandle) where Self: Sized { manager.bind(handle); }
+    fn unbind(manager: &GlObjectManager, handle: GlObjectHandle) where Self: Sized { manager.unbind(handle); }
 }
 impl_downcast!(GlObject);

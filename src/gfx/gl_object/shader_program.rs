@@ -186,8 +186,8 @@ impl GlObject for ShaderProgram { }
 
 impl Bindable for ShaderProgram
 {
-    fn bind(&self) { self.context.use_program(Some(&self.internal)); }
-    fn unbind(&self) { self.context.use_program(None); }
+    fn bind_internal(&self) { self.context.use_program(Some(&self.internal)); }
+    fn unbind_internal(&self) { self.context.use_program(None); }
 }
 
 impl Reloadable for ShaderProgram
@@ -197,7 +197,7 @@ impl Reloadable for ShaderProgram
         self.context = context.clone();
         self.internal = ShaderProgram::new_program(&self.context)?;
         self.compile()?;
-        self.bind();
+        self.bind_internal();
 
         // Restore all block bindings
         for (block_binding, block_name) in self.block_bindings.to_owned().iter().enumerate()

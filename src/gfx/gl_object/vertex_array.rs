@@ -86,7 +86,7 @@ impl VertexArray
     /// Add a `Buffer` to this `VertexArray` with the given `AttribPointer`s, if any
     pub fn add_buffer(&mut self, buffer: Buffer, attrib_ptrs: Option<Vec<AttribPointer>>) -> Index
     {
-        buffer.bind();
+        buffer.bind_internal();
         if let Some(attrib_ptrs) = &attrib_ptrs
         {
             self.set_attrib_ptrs(&attrib_ptrs);
@@ -130,11 +130,11 @@ impl GlObject for VertexArray {}
 
 impl Bindable for VertexArray
 {
-    fn bind(&self)
+    fn bind_internal(&self)
     {
         self.context.bind_vertex_array(Some(&self.internal));
     }
-    fn unbind(&self)
+    fn unbind_internal(&self)
     {
         self.context.bind_vertex_array(None);
     }
@@ -146,7 +146,7 @@ impl Reloadable for VertexArray
     {
         self.context = context.clone();
         self.internal = VertexArray::new_vertex_array(&self.context)?;
-        self.bind();
+        self.bind_internal();
 
         for index in self.allocator.iter()
         {

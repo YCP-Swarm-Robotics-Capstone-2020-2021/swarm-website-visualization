@@ -6,6 +6,7 @@ use std::
     any::TypeId,
     cell::
     {
+        Cell,
         RefCell,
         Ref,
         RefMut,
@@ -46,10 +47,10 @@ pub struct GlObjectHandle
 }
 pub struct GlObjectManager
 {
-    objects: ClosedGenVec<RefCell<dyn GlObject>>,
+    objects: ClosedGenVec<RefCell<Box<dyn GlObject>>>,
 
     bound_allocator: IndexAllocator,
-    bound_types: ExposedGenVec<bool>,
+    bound_types: ExposedGenVec<Cell<bool>>,
     type_handles: HashMap<GlObjectType, Index, BuildHasherDefault<XxHash32>>,
 }
 
@@ -59,8 +60,8 @@ impl GlObjectManager
     {
         GlObjectManager
         {
-            objects: ExposedGenVec::new(),
-            bound_allocator: ExposedGenVec::new(),
+            objects: ClosedGenVec::new(),
+            bound_allocator: IndexAllocator::new(),
             bound_types: ExposedGenVec::new(),
             type_handles: Default::default(),
         }
@@ -68,18 +69,20 @@ impl GlObjectManager
 
     pub fn insert<T>(&mut self, obj: T, type_: GlObjectType) -> GlObjectHandle where T: GlObject + 'static
     {
-        let type_handle = match self.type_handles.contains_key(&type_)
+
+        let type_handle = match self.type_handles.get(&type_)
         {
-            Some(handle) => handle,
+            Some(handle) => *handle,
             None =>
                 {
                     let handle = self.bound_allocator.allocate();
                     self.type_handles.insert(type_, handle);
+                    self.bound_types.set(handle, Cell::new(false));
                     handle
                 }
         };
         
-        let object_handle = self.objects.insert(Box::new(obj));
+        let object_handle = self.objects.insert(RefCell::new(Box::new(obj)));
 
         GlObjectHandle { type_handle, object_handle }
     }
@@ -102,8 +105,32 @@ impl GlObjectManager
     {
         match self.objects.get_mut(handle.object_handle)
         {
-            Some(obj) => Some(RefMut::map(obj.borrow_mut(), |obj| obj.downcast_ref::<T>().expect("GlObject downcast"))),
+            Some(obj) => Some(RefMut::map(obj.borrow_mut(), |obj| obj.downcast_mut::<T>().expect("GlObject downcast"))),
             _ => None
+        }
+    }
+
+    pub(in crate::gfx) fn bind(&self, handle: GlObjectHandle)
+    {
+        if let Some(obj) = self.objects.get(handle.object_handle)
+        {
+            obj.borrow().bind_internal();
+            if let Some(bound) = self.bound_types.get(handle.type_handle)
+            {
+                bound.set(true);
+            }
+        }
+    }
+
+    pub(in crate::gfx) fn unbind(&self, handle: GlObjectHandle)
+    {
+        if let Some(obj) = self.objects.get(handle.object_handle)
+        {
+            obj.borrow().unbind_internal();
+            if let Some(bound) = self.bound_types.get(handle.type_handle)
+            {
+                bound.set(false);
+            }
         }
     }
 

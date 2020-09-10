@@ -4,7 +4,7 @@ use crate::gfx::
     GfxError,
     gl_object::
     {
-        manager::{GlObjectHandle, GlObjectManager},
+        manager::{GlObjectHandle, GlObjectManager, GlObjectType},
         traits::{GlObject, Bindable, Reloadable},
         buffer::Buffer,
         shader_program::ShaderProgram,
@@ -53,7 +53,7 @@ static BLOCK_BINDINGS: AtomicU32 = AtomicU32::new(0);
 
 pub struct UniformBuffer
 {
-    buffer: Buffer,
+    buffer: GlObjectHandle,
 
     vert_size: i32,
     frag_size: i32,
@@ -67,7 +67,7 @@ pub struct UniformBuffer
 
 impl UniformBuffer
 {
-    pub fn new(context: &Context, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<UniformBuffer, GfxError>
+/*    pub fn new(context: &Context, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<UniformBuffer, GfxError>
     {
         let vert_size = align(&context, vert_size);
         // not necessary to align frag size since it isn't used as an offset
@@ -91,6 +91,35 @@ impl UniformBuffer
             vert_binding: None,
             frag_binding: None
         })
+    }*/
+
+    pub fn new_(context: &Context, manager: &mut GlObjectManager, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<GlObjectHandle, GfxError>
+    {
+        let vert_size = align(&context, vert_size);
+        // not necessary to align frag size since it isn't used as an offset
+        //let frag_size = align(&context, frag_size);
+
+        let ub = UniformBuffer
+        {
+            buffer:
+            {
+                let buffer_handle = Buffer::new(&context, &mut manager, Context::UNIFORM_BUFFER)?;
+                Buffer::bind(&manager, buffer_handle);
+                let buffer = manager.get_mut::<Buffer>(buffer_handle).unwrap();
+                buffer.buffer_data_raw(&vec![0u8; (vert_size + frag_size) as usize], draw_type);
+                buffer_handle
+            },
+            vert_size,
+            frag_size,
+
+            vert_offset: 0,
+            frag_offset: vert_size,
+
+            vert_binding: None,
+            frag_binding: None
+        };
+
+        Ok(manager.insert(ub, GlObjectType::Buffer(Context::UNIFORM_BUFFER)))
     }
 
     /// Set `data` as the contents of the vertex shader uniform block
@@ -148,17 +177,12 @@ impl UniformBuffer
 
 impl GlObject for UniformBuffer
 {
-    fn bind(manager: &mut GlObjectManager, handle: gen_vec::Index) where Self: Sized
-    {
-        let ub = manager.get::<UniformBuffer>(handle);
-        GlObject::bind(&mut manager, )
-    }
 }
 
 impl Bindable for UniformBuffer
 {
-    fn bind(&self) { self.buffer.bind(); }
-    fn unbind(&self) { self.buffer.unbind(); }
+    fn bind_internal(&self) { self.buffer.bind(); }
+    fn unbind_internal(&self) { self.buffer.unbind(); }
 }
 
 impl Reloadable for UniformBuffer
