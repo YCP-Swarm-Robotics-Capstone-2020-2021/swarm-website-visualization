@@ -18,10 +18,6 @@ use crate::gfx::
     Context,
     GfxError,
     gl_object::traits::{GlObject, Bindable, Reloadable},
-    buffer::Buffer,
-    shader::shaderprogram::ShaderProgram,
-    texture::Texture,
-    vertex_array::VertexArray,
 };
 
 /// Different GlObjects currently available

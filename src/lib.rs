@@ -38,16 +38,15 @@ use crate::
         Context,
         new_context,
         render_loop::RenderLoop,
-        shader::
+        renderer::{vertex::Vertex},
+        gl_object::
         {
-            shaderprogram::ShaderProgram,
-            shadersrc,
+            shader_program::{ShaderProgram, ShaderType, shader_source::*},
             uniform_buffer::UniformBuffer,
-        },
-        vertex_array::{AttribPointer, VertexArray},
-        buffer::Buffer,
-        texture::Texture,
-        renderer::{vertex::Vertex}
+            vertex_array::{AttribPointer, VertexArray},
+            buffer::Buffer,
+            texture::{Texture, TextureParams},
+        }
     },
     input::
     {
@@ -64,7 +63,6 @@ use cgmath::
     vec3,
     Vector4
 };
-use crate::gfx::texture::TextureParams;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
