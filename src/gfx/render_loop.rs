@@ -23,7 +23,7 @@ use crate::
         GfxError,
         GlError,
         gl_get_errors,
-        gl_object::GlObject,
+        gl_object::traits::GlObject,
     },
 };
 
