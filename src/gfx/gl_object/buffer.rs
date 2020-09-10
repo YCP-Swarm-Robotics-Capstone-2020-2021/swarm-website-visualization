@@ -6,23 +6,17 @@ use crate::gfx::
     gl_get_errors,
     gl_object::
     {
-        manager::
-        {
-            GlWrapperHandle,
-            GlWrapperManager,
-            WebGlWrapper,
-        },
-        traits::GlObject,
+        manager::{GlObjectHandle, GlObjectManager},
+        traits::{GlObject, Bindable, Reloadable}
     },
 };
-use wasm_bindgen::JsCast;
 
 #[derive(Debug, Copy, Clone)]
 struct RangeBinding(u32, i32, i32);
 
 pub struct Buffer
 {
-    internal: WebGlWrapper,
+    internal: WebGlBuffer,
     context: Context,
     buffer_type: u32,
     draw_type: u32,
@@ -50,10 +44,6 @@ impl Buffer
 
     pub fn new(context: &Context, buffer_type: u32) -> Result<Buffer, GfxError>
     {
-        let wrapper = WebGlWrapper::new(
-            Buffer::new_buffer(&context)?,
-            |&obj| context.bind_buffer(self.buffer_type, Some(&self.internal))
-        );
         Ok(Buffer
         {
             internal: Buffer::new_buffer(&context)?,
@@ -67,7 +57,7 @@ impl Buffer
 
     /// Set the contents of the buffer to `data`
     /// `draw_type` is one of the webgl `*_DRAW` enum types
-    pub fn _buffer_data<T>(manager: &mut GlWrapperManager, handle: GlWrapperHandle, data: &[T], draw_type: u32)
+    pub fn _buffer_data<T>(manager: &mut GlObjectManager, handle: GlObjectHandle, data: &[T], draw_type: u32)
     {
 
     }
@@ -78,7 +68,7 @@ impl Buffer
 
     /// Set the contents of the buffer to `data`
     /// `draw_type` is one of the webgl `*_DRAW` enum types
-    pub fn _buffer_data_raw(manager: &mut GlWrapperManager, handle: GlWrapperHandle, data: &[u8], draw_type: u32)
+    pub fn _buffer_data_raw(manager: &mut GlObjectManager, handle: GlObjectHandle, data: &[u8], draw_type: u32)
     {
         let buffer = manager.get_mut::<Buffer>(handle);
     }
@@ -117,16 +107,22 @@ impl Buffer
     }
 }
 
-impl GlObject for Buffer
+impl GlObject for Buffer {}
+
+impl Bindable for Buffer
 {
-    fn bind(&self, manager: &GlWrapperManager)
+    fn bind(&self)
     {
         self.context.bind_buffer(self.buffer_type, Some(&self.internal));
     }
-    fn unbind(&self, manager: &GlWrapperManager)
+    fn unbind(&self)
     {
         self.context.bind_buffer(self.buffer_type, None);
     }
+}
+
+impl Reloadable for Buffer
+{
     fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();
@@ -145,15 +141,6 @@ impl GlObject for Buffer
 
         Ok(())
     }
-}
-
-impl Bindable for Buffer
-{
-
-}
-
-impl Reloadable for Buffer
-{
 }
 
 impl Drop for Buffer

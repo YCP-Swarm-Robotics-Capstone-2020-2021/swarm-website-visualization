@@ -4,7 +4,7 @@ use crate::gfx::
     GfxError,
     gl_object::
     {
-        manager::{GlWrapperHandle, GlWrapperManager},
+        manager::{GlObjectHandle, GlObjectManager},
         traits::{GlObject, Bindable, Reloadable},
         buffer::Buffer,
         shader::shaderprogram::ShaderProgram,
@@ -148,6 +148,11 @@ impl UniformBuffer
 
 impl GlObject for UniformBuffer
 {
+    fn bind(manager: &mut GlObjectManager, handle: gen_vec::Index) where Self: Sized
+    {
+        let ub = manager.get::<UniformBuffer>(handle);
+        GlObject::bind(&mut manager, )
+    }
 }
 
 impl Bindable for UniformBuffer

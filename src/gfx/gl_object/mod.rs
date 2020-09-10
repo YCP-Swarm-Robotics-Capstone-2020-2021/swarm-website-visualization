@@ -1,5 +1,4 @@
 pub mod traits;
-pub mod wrapper;
 pub mod manager;
 
 pub mod buffer;

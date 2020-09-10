@@ -11,11 +11,8 @@ use crate::gfx::
     Context,
     GfxError,
     gl_get_errors,
-    gl_object::
-    {
-        manager::{GlWrapperHandle, GlWrapperManager},
-        traits::{GlObject, Bindable, Reloadable},
-    },
+    gl_object::GlObject,
+    manager::{GlObjectHandle, GlObjectManager},
 };
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
@@ -182,16 +179,10 @@ impl ShaderProgram
 
 }
 
-impl GlObject for ShaderProgram {}
-
-impl Bindable for ShaderProgram
+impl GlObject for ShaderProgram
 {
     fn bind(&self) { self.context.use_program(Some(&self.internal)); }
     fn unbind(&self) { self.context.use_program(None); }
-}
-
-impl Reloadable for ShaderProgram
-{
     fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();

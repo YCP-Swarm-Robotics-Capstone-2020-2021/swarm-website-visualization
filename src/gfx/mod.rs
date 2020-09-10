@@ -1,7 +1,7 @@
 //! All things graphics related
 
 use gen_vec::Index;
-use crate::gfx::gl_object::shader::shaderprogram::ShaderType;
+use crate::gfx::shader::shaderprogram::ShaderType;
 
 pub type Context = web_sys::WebGl2RenderingContext;
 

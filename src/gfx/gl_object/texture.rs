@@ -6,7 +6,7 @@ use crate::gfx::
     gl_get_errors,
     gl_object::
     {
-        manager::{GlWrapperHandle, GlWrapperManager},
+        manager::{GlObjectHandle, GlObjectManager},
         traits::{GlObject, Bindable, Reloadable}
     },
 };

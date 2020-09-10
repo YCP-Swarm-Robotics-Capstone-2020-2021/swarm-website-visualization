@@ -6,38 +6,22 @@ use std::
     any::TypeId,
     cell::
     {
-        Cell,
         RefCell,
         Ref,
         RefMut,
     },
 };
 use twox_hash::XxHash32;
-use wasm_bindgen::
-{
-    prelude::*,
-    JsCast,
-    JsValue,
-};
+
 use crate::gfx::
 {
     Context,
     GfxError,
-    gl_object::
-    {
-        traits::
-        {
-            GlObject,
-            Bindable,
-            Reloadable
-        },
-        wrapper::WebGlWrapper,
-        buffer::Buffer,
-        shader::shaderprogram::ShaderProgram,
-        texture::Texture,
-        vertex_array::VertexArray,
-    },
-
+    gl_object::traits::{GlObject, Bindable, Reloadable},
+    buffer::Buffer,
+    shader::shaderprogram::ShaderProgram,
+    texture::Texture,
+    vertex_array::VertexArray,
 };
 
 /// Different GlObjects currently available
@@ -54,78 +38,43 @@ pub enum GlObjectType
     VertexArray,
 }
 
-/// Wraps a raw WebGl* JS type
-pub struct WebGlWrapper
-{
-    internal: JsValue,
-    type_: GlObjectType,
-    bind_func: Box<dyn Fn(&Context, &JsValue)>,
-    unbind_func: Box<dyn Fn()>
-}
-
-impl WebGlWrapper
-{
-    pub fn bind(&self, context: &Context)
-    {
-        (self.bind_func)(&context, &self.internal);
-    }
-
-    pub fn unbind(&self, context: &Context)
-    {
-    }
-
-    pub fn update_internal(&mut self, internal: JsValue)
-    {
-        self.internal = internal;
-    }
-}
-
 /// Handle to a GlObject
-pub struct GlWrapperHandle
+pub struct GlObjectHandle
 {
     // Handle to the type of a GlObject
     // Used for binding and unbinding GlObject's
     // based on type
     type_handle: Index,
     // Handle to the object itself
-    wrapper_handle: Index
+    object_handle: Index
 }
-pub struct GlWrapperManager
+pub struct GlObjectManager
 {
-    wrappers: ClosedGenVec<WebGlWrapper>,
+    objects: ClosedGenVec<RefCell<dyn GlObject>>,
 
     bound_allocator: IndexAllocator,
-    bound_types: ExposedGenVec<Cell<bool>>,
+    bound_types: ExposedGenVec<bool>,
     type_handles: HashMap<GlObjectType, Index, BuildHasherDefault<XxHash32>>,
 }
 
-impl GlWrapperManager
+impl GlObjectManager
 {
-    pub fn new() -> GlWrapperManager
+    pub fn new() -> GlObjectManager
     {
-        GlWrapperManager
+        GlObjectManager
         {
-            wrappers: ClosedGenVec::new(),
-            bound_allocator: IndexAllocator::new(),
+            objects: ExposedGenVec::new(),
+            bound_allocator: ExposedGenVec::new(),
             bound_types: ExposedGenVec::new(),
             type_handles: Default::default(),
         }
     }
 
-    pub fn new_wrapper<B, U>(&mut self, internal: JsValue, type_: GlObjectType, bind_func: B, unbind_func: U) -> GlWrapperHandle
-        where B: Fn(&Context, &JsValue) + 'static, U: Fn() + 'static
+    pub fn insert<T>(&mut self, obj: T, type_: GlObjectType) -> GlObjectHandle where T: GlObject + 'static
     {
-        let wrapper = WebGlWrapper
+        let type_handle = match self.type_handles.contains_key(&type_)
         {
-            internal,
-            type_,
-            bind_func: Box::new(bind_func),
-            unbind_func: Box::new(unbind_func),
-        };
-
-        let type_handle = match self.type_handles.get(&type_)
-        {
-            Some(handle) => *handle,
+            Some(handle) => handle,
             None =>
                 {
                     let handle = self.bound_allocator.allocate();
@@ -133,40 +82,70 @@ impl GlWrapperManager
                     handle
                 }
         };
+        
+        let object_handle = self.objects.insert(Box::new(obj));
 
-        let wrapper_handle = self.wrappers.insert(wrapper);
-        GlWrapperHandle { type_handle, wrapper_handle }
+        GlObjectHandle { type_handle, object_handle }
     }
 
-    pub fn remove(&mut self, handle: GlWrapperHandle)
+    pub fn remove<T>(&mut self, handle: GlObjectHandle) where T: GlObject + 'static
     {
-        self.wrappers.remove(handle.wrapper_handle);
+        self.objects.remove(handle.object_handle);
     }
 
-    pub fn get(&self, handle: GlWrapperHandle) -> Option<&WebGlWrapper>
+    pub(in crate::gfx) fn get<T>(&self, handle: GlObjectHandle) -> Option<Ref<T>> where T: GlObject + 'static
     {
-        self.wrappers.get(handle.wrapper_handle)
+        match self.objects.get(handle.object_handle)
+        {
+            Some(obj) => Some(Ref::map(obj.borrow(), |obj| obj.downcast_ref::<T>().expect("GlObject downcast"))),
+            _ => None
+        }
     }
 
-    pub fn get_mut(&mut self, handle: GlWrapperHandle) -> Option<&mut WebGlWrapper>
+    pub(in crate::gfx) fn get_mut<T>(&mut self, handle: GlObjectHandle) -> Option<RefMut<T>> where T: GlObject + 'static
     {
-        self.wrappers.get_mut(handle.wrapper_handle)
+        match self.objects.get_mut(handle.object_handle)
+        {
+            Some(obj) => Some(RefMut::map(obj.borrow_mut(), |obj| obj.downcast_ref::<T>().expect("GlObject downcast"))),
+            _ => None
+        }
     }
 
-    pub fn bind(&self, handle: GlWrapperHandle, context: &Context)
+/*    pub(in crate::gfx) fn bind(&mut self, handle: GlObjectHandle)
     {
-        self.bound_types.get(handle.type_handle)?.set(true);
-        self.wrappers.get(handle.wrapper_handle)?.bind(&context);
+        if let Some(obj) = self.objects.get(handle)
+        {
+            obj.bind();
+            self.bound.insert(TypeId::of::<T>(), handle);
+        }
     }
 
-    pub fn unbind(&self, handle: GlWrapperHandle, context: &Context)
+    pub(in crate::gfx) fn unbind(&mut self, handle: GlObjectHandle)
     {
-        self.bound_types.get(handle.type_handle)?.set(false);
-        self.wrappers.get(handle.wrapper_handle)?.bind(&context);
+        if let Some(obj) = self.objects.get(handle)
+        {
+            obj.unbind();
+            self.bound.insert(TypeId::of::<T>(), None);
+        }
     }
 
-    pub fn update_internal(&mut self, handle: GlWrapperHandle, internal: &JsValue)
+    pub fn reload_objects(&mut self, context: &Context) -> Result<(), GfxError>
     {
-        *self.wrappers.get_mut(handle.wrapper_handle)?.internal = internal;
-    }
+        for (_, obj) in &mut self.objects
+        {
+            obj.reload(&context);
+        }
+
+        for (_, handle) in &self.bound
+        {
+            if let Some(handle) = *handle
+            {
+                if let Some(obj) = self.objects.get(handle)
+                {
+                    obj.bind();
+                }
+            }
+        }
+        Ok(())
+    }*/
 }
