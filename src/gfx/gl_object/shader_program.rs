@@ -11,8 +11,11 @@ use crate::gfx::
     Context,
     GfxError,
     gl_get_errors,
-    gl_object::GlObject,
-    manager::{GlObjectHandle, GlObjectManager},
+    gl_object::
+    {
+        manager::{GlObjectHandle, GlObjectManager},
+        traits::{GlObject, Bindable, Reloadable},
+    },
 };
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
@@ -179,10 +182,16 @@ impl ShaderProgram
 
 }
 
-impl GlObject for ShaderProgram
+impl GlObject for ShaderProgram { }
+
+impl Bindable for ShaderProgram
 {
     fn bind(&self) { self.context.use_program(Some(&self.internal)); }
     fn unbind(&self) { self.context.use_program(None); }
+}
+
+impl Reloadable for ShaderProgram
+{
     fn reload(&mut self, context: &Context) -> Result<(), GfxError>
     {
         self.context = context.clone();
@@ -214,4 +223,21 @@ impl Drop for ShaderProgram
     {
         self.context.delete_program(Some(&self.internal));
     }
+}
+
+pub mod shader_source
+{
+    macro_rules! shader_source
+    {
+    ($path:expr) =>
+    {
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), concat!("/", $path)))
+    }
+}
+
+    pub const BASIC_VERT: &'static str = shader_source!("shaders/basic_vert.glsl");
+    pub const BASIC_FRAG: &'static str = shader_source!("shaders/basic_frag.glsl");
+
+    pub const TEXTURE_VERT: &'static str = shader_source!("shaders/texture_vert.glsl");
+    pub const TEXTURE_FRAG: &'static str = shader_source!("shaders/texture_frag.glsl");
 }

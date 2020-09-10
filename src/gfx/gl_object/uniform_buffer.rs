@@ -7,7 +7,7 @@ use crate::gfx::
         manager::{GlObjectHandle, GlObjectManager},
         traits::{GlObject, Bindable, Reloadable},
         buffer::Buffer,
-        shader::shaderprogram::ShaderProgram,
+        shader::shader_program::ShaderProgram,
     },
 };
 use std::
