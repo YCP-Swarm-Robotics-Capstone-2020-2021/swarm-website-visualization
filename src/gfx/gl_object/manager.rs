@@ -35,6 +35,7 @@ pub enum GlObjectType
     VertexArray,
 }
 
+/*
 /// Handle to a GlObject
 pub struct GlObjectHandle
 {
@@ -171,4 +172,85 @@ impl GlObjectManager
         }
         Ok(())
     }*/
+}*/
+
+macro_rules! define_manager
+{
+    ($manager_name:ident, $handle_name:ident => $($managee_name:ident: $managee_type:ident),+) =>
+    {paste::paste!
+    {
+        pub type $handle_name = Index;
+        pub struct $manager_name
+        {
+            $(
+            [<$managee_name s>]: ClosedGenVec<RefCell<crate::gfx::gl_object::$managee_name::$managee_type>>,
+            [<bound_ $managee_name>]: Option<Index>
+            ),+
+        }
+
+        impl $manager_name
+        {
+            pub fn new() -> $manager_name
+            {
+                $manager_name
+                {
+                    $(
+                    [<$managee_name s>]: ClosedGenVec::new(),
+                    [<bound_ $managee_name>]: None
+                    ),+
+                }
+            }
+
+            $(
+            pub fn [<insert_ $managee_name>](&mut self, $managee_name: crate::gfx::gl_object::$managee_name::$managee_type) -> Index
+            {
+                self.[<$managee_name s>].insert(RefCell::new($managee_name))
+            }
+            pub(in crate::gfx::gl_object) fn [<get_ $managee_name>](&self, handle: Index) -> Option<Ref<crate::gfx::gl_object::$managee_name::$managee_type>>
+            {
+                Some(self.[<$managee_name s>].get(handle)?.borrow())
+            }
+            pub(in crate::gfx::gl_object) fn [<get_mut_ $managee_name>](&self, handle: Index) -> Option<RefMut<crate::gfx::gl_object::$managee_name::$managee_type>>
+            {
+                Some(self.[<$managee_name s>].get(handle)?.borrow_mut())
+            }
+            pub(in crate::gfx::gl_object) fn [<remove_ $managee_name>](&mut self, handle: Index)
+            {
+                self.[<$managee_name s>].remove(handle);
+            }
+            pub(in crate::gfx::gl_object) fn [<bind_ $managee_name>](&mut self, handle: Option<Index>)
+            {
+                if let Some(handle) = handle
+                {
+                    if self.[<$managee_name s>].contains(handle)
+                    {
+                        self.[<bound_ $managee_name>] = Some(handle)
+                    }
+                }
+                else
+                {
+                    self.[<bound_ $managee_name>] = handle;
+                }
+            }
+            )+
+
+            pub fn reload_objects(&mut self, context: &Context)
+            {
+                $(
+                for (_, obj) in &mut self.[<$managee_name s>] { obj.borrow_mut().reload(&context); }
+                )+
+
+                $(
+                if let Some(handle) = self.[<bound_ $managee_name>]
+                {
+                    if let Some(obj) = self.[<$managee_name s>].get(handle)
+                    {
+                        obj.borrow().bind_internal();
+                    }
+                }
+                )+
+            }
+        }
+    }}
 }
+define_manager!(GlObjectManager, GlObjectHandle => buffer: Buffer, shader_program: ShaderProgram, texture: Texture, uniform_buffer: UniformBuffer, vertex_array: VertexArray);

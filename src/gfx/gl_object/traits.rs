@@ -19,7 +19,7 @@ pub trait Reloadable
 
 pub trait GlObject: Bindable + Reloadable + Drop + downcast_rs::Downcast
 {
-    fn bind(manager: &GlObjectManager, handle: GlObjectHandle) where Self: Sized { manager.bind(handle); }
-    fn unbind(manager: &GlObjectManager, handle: GlObjectHandle) where Self: Sized { manager.unbind(handle); }
+    fn bind(manager: &GlObjectManager, handle: GlObjectHandle) where Self: Sized { /*manager.bind(handle);*/ }
+    fn unbind(manager: &GlObjectManager, handle: GlObjectHandle) where Self: Sized { /*manager.unbind(handle);*/ }
 }
 impl_downcast!(GlObject);

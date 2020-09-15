@@ -26,6 +26,8 @@ mod redeclare;
 extern crate memoffset;
 #[macro_use]
 extern crate downcast_rs;
+#[macro_use]
+extern crate paste;
 
 mod gfx;
 mod input;

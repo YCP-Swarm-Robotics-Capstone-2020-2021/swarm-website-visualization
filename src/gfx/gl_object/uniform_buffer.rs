@@ -53,7 +53,8 @@ static BLOCK_BINDINGS: AtomicU32 = AtomicU32::new(0);
 
 pub struct UniformBuffer
 {
-    buffer: GlObjectHandle,
+    //buffer: GlObjectHandle,
+    buffer: Buffer,
 
     vert_size: i32,
     frag_size: i32,
@@ -78,7 +79,7 @@ impl UniformBuffer
             buffer:
             {
                 let mut buffer = Buffer::new(&context, Context::UNIFORM_BUFFER)?;
-                buffer.bind();
+                buffer.bind_internal();
                 buffer.buffer_data_raw(&vec![0u8; (vert_size + frag_size) as usize], draw_type);
                 buffer
             },
@@ -93,7 +94,7 @@ impl UniformBuffer
         })
     }*/
 
-    pub fn new_(context: &Context, manager: &mut GlObjectManager, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<GlObjectHandle, GfxError>
+/*    pub fn new_(context: &Context, manager: &mut GlObjectManager, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<GlObjectHandle, GfxError>
     {
         let vert_size = align(&context, vert_size);
         // not necessary to align frag size since it isn't used as an offset
@@ -120,7 +121,7 @@ impl UniformBuffer
         };
 
         Ok(manager.insert(ub, GlObjectType::Buffer(Context::UNIFORM_BUFFER)))
-    }
+    }*/
 
     /// Set `data` as the contents of the vertex shader uniform block
     pub fn buffer_vert_data<T>(&mut self, data: &[T])
@@ -156,7 +157,7 @@ impl UniformBuffer
             self.vert_binding = Some(BLOCK_BINDINGS.fetch_add(1, Ordering::Relaxed));
         }
         shader_program.add_uniform_block_binding(block_name, self.vert_binding.unwrap())?;
-        self.buffer.bind();
+        self.buffer.bind_internal();
         self.buffer.bind_range(self.vert_binding.unwrap(), self.vert_offset, self.vert_size);
         Ok(())
     }
@@ -169,7 +170,7 @@ impl UniformBuffer
             self.frag_binding = Some(BLOCK_BINDINGS.fetch_add(1, Ordering::Relaxed));
         }
         shader_program.add_uniform_block_binding(block_name, self.frag_binding.unwrap())?;
-        self.buffer.bind();
+        self.buffer.bind_internal();
         self.buffer.bind_range(self.frag_binding.unwrap(), self.frag_offset, self.frag_size);
         Ok(())
     }
@@ -181,8 +182,8 @@ impl GlObject for UniformBuffer
 
 impl Bindable for UniformBuffer
 {
-    fn bind_internal(&self) { self.buffer.bind(); }
-    fn unbind_internal(&self) { self.buffer.unbind(); }
+    fn bind_internal(&self) { self.buffer.bind_internal(); }
+    fn unbind_internal(&self) { self.buffer.unbind_internal(); }
 }
 
 impl Reloadable for UniformBuffer

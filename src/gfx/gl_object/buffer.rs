@@ -66,7 +66,8 @@ impl Buffer
             buffer: vec![],
             range_bindings: vec![]
         };
-        Ok(manager.insert(buffer, GlObjectType::Buffer(buffer_type)))
+        Ok(manager.insert_buffer(buffer))
+        //Ok(manager.insert(buffer, GlObjectType::Buffer(buffer_type)))
     }
 
     /// Set the contents of the buffer to `data`
@@ -103,7 +104,7 @@ impl Buffer
     /// Bind `index` to the buffer memory range `offset`->`offset+size`
     pub fn bind_range(&mut self, index: u32, offset: i32, size: i32)
     {
-        self.context.bind_buffer_range_with_i32_and_i32(self.buffer_type, index, Some(&self.internal), offset, size);
+            self.context.bind_buffer_range_with_i32_and_i32(self.buffer_type, index, Some(&self.internal), offset, size);
 
         if self.range_bindings.len() <= index as usize
         {
