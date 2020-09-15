@@ -58,8 +58,6 @@ pub struct VertexArray
 {
     internal: WebGlVertexArrayObject,
     context: Context,
-    allocator: IndexAllocator,
-    buffers: ExposedGenVec<Buffer>,
     attrib_ptrs: ExposedGenVec<Option<Vec<AttribPointer>>>
 }
 
@@ -77,24 +75,19 @@ impl VertexArray
         {
             internal: VertexArray::new_vertex_array(&context)?,
             context: context.clone(),
-            allocator: IndexAllocator::new(),
-            buffers: ExposedGenVec::new(),
             attrib_ptrs: ExposedGenVec::new(),
         })
     }
 
-    /// Add a `Buffer` to this `VertexArray` with the given `AttribPointer`s, if any
-    pub fn add_buffer(&mut self, buffer: Buffer, attrib_ptrs: Option<Vec<AttribPointer>>) -> Index
+    /// Registers `buffer` to this `VertexArray` with the given `AttribPointer`s, if any
+    /// The target buffer MUST be bound directly before calling this function
+    pub fn register_buffer(&mut self, handle: GlObjectHandle, attrib_ptrs: Option<Vec<AttribPointer>>)
     {
-        buffer.bind_internal();
         if let Some(attrib_ptrs) = &attrib_ptrs
         {
             self.set_attrib_ptrs(&attrib_ptrs);
         }
-        let handle = self.allocator.allocate();
-        self.buffers.set(handle, buffer);
         self.attrib_ptrs.set(handle, attrib_ptrs);
-        handle
     }
 
     fn set_attrib_ptrs(&self, attrib_ptrs: &Vec<AttribPointer>)
@@ -107,26 +100,13 @@ impl VertexArray
     }
 
     #[allow(dead_code)]
-    pub fn get_buffer(&self, handle: Index) -> Result<&Buffer, GfxError>
-    {
-        self.buffers.get(handle).ok_or_else(|| GfxError::InvalidHandle(handle))
-    }
-
-    #[allow(dead_code)]
-    pub fn get_buffer_mut(&mut self, handle: Index) -> Result<&mut Buffer, GfxError>
-    {
-        self.buffers.get_mut(handle).ok_or_else(|| GfxError::InvalidHandle(handle))
-    }
-
-    #[allow(dead_code)]
-    pub fn remove_buffer(&mut self, handle: Index) -> Result<Buffer, GfxError>
+    pub fn unregister_buffer(&mut self, handle: GlObjectHandle)
     {
         self.attrib_ptrs.remove(handle);
-        self.buffers.remove(handle).ok_or_else(|| GfxError::InvalidHandle(handle))
     }
 }
 
-impl GlObject for VertexArray {}
+impl_globject!(vertex_array, VertexArray);
 
 impl Bindable for VertexArray
 {
@@ -142,11 +122,17 @@ impl Bindable for VertexArray
 
 impl Reloadable for VertexArray
 {
-    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context, manager: &mut GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = VertexArray::new_vertex_array(&self.context)?;
         self.bind_internal();
+
+        for (handle, attrib_ptrs) in &self.attrib_ptrs
+        {
+            manager.get(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?.borrow().bind_internal();
+            self.set_attrib_ptrs(&attrib_ptrs)
+        }
 
         for index in self.allocator.iter()
         {
@@ -157,6 +143,10 @@ impl Reloadable for VertexArray
             }
         }
 
+        // If this isn't unbound and a different VERTEX_ARRAY buffer gets bound,
+        // then it will overwrite the VERTEX_ARRAY buffer currently attached to
+        // this vertex array object
+        self.unbind_internal();
         Ok(())
     }
 }

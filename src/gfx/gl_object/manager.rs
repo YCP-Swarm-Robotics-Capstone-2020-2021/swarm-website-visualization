@@ -218,19 +218,26 @@ macro_rules! define_manager
             {
                 self.[<$managee_name s>].remove(handle);
             }
-            pub(in crate::gfx::gl_object) fn [<bind_ $managee_name>](&mut self, handle: Option<Index>)
+            pub(in crate::gfx::gl_object) fn [<bind_ $managee_name>](&mut self, handle: Option<Index>) -> Result<(), GfxError>
             {
                 if let Some(handle) = handle
                 {
-                    if self.[<$managee_name s>].contains(handle)
+                    if let Some(obj) = self.[<$managee_name s>].get(handle)
                     {
-                        self.[<bound_ $managee_name>] = Some(handle)
+                        self.[<bound_ $managee_name>] = Some(handle);
+                        obj.bind();
+                    }
+                    else
+                    {
+                        return Err(GfxError::InvalidHandle(handle))
                     }
                 }
                 else
                 {
                     self.[<bound_ $managee_name>] = handle;
                 }
+
+                Ok(())
             }
             )+
 
