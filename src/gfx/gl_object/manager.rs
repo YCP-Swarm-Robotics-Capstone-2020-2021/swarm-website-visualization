@@ -176,6 +176,7 @@ impl GlObjectManager
 
 macro_rules! define_manager
 {
+    // TODO: Some of these should probably be tt instead of ident
     ($manager_name:ident, $handle_name:ident => $($managee_name:ident: $managee_type:ident),+) =>
     {paste::paste!
     {
