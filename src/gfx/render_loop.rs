@@ -23,7 +23,7 @@ use crate::
         GfxError,
         GlError,
         gl_get_errors,
-        gl_object::GlObject,
+        gl_object::manager::GlObjectManager,
     },
 };
 
@@ -35,8 +35,7 @@ pub struct RenderLoop
     context_lost_ev: Option<EventListener>,
     context_restored_ev: Option<EventListener>,
     valid_context: Rc<RefCell<bool>>,
-    // GlObjects to be stored during context loss recovery
-    gl_objects: Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>>,
+    globject_manager: Rc<RefCell<GlObjectManager>>,
     // Is the render loop running
     running: Rc<RefCell<bool>>,
     // request_animation_frame() callback that calls given render func
@@ -54,7 +53,7 @@ impl RenderLoop
         window: &Window,
         canvas: &HtmlCanvasElement,
         context: &Rc<RefCell<Context>>,
-        gl_objects: &Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>>,
+        globject_manager: &Rc<RefCell<GlObjectManager>>,
         render_func: T
     ) -> Result<RenderLoop, GfxError>
     {
@@ -66,7 +65,7 @@ impl RenderLoop
             context_lost_ev: None,
             context_restored_ev: None,
             valid_context: Rc::new(RefCell::new(true)),
-            gl_objects: gl_objects.clone(),
+            globject_manager: globject_manager.clone(),
             running: Rc::new(RefCell::new(false)),
             raf_callback: Rc::new(RefCell::new(None)),
             raf_handle: Rc::new(RefCell::new(-1)),
@@ -99,7 +98,7 @@ impl RenderLoop
     {
         let callback =
             {
-                clone!(self.canvas, self.context, self.valid_context, self.gl_objects);
+                clone!(self.canvas, self.context, self.valid_context, self.globject_manager);
                 move |_event: web_sys::WebGlContextEvent|
                     {
                         let mut context = context.borrow_mut();
@@ -107,10 +106,8 @@ impl RenderLoop
                         *context = new_context(&canvas).unwrap();
 
                         // Recreate and reload all given GlObjects with new context
-                        for obj in gl_objects.borrow().iter()
-                        {
-                            obj.borrow_mut().recreate_and_reload(&context).expect("GlObject recreated and reloaded");
-                        }
+
+                        globject_manager.borrow_mut().reload_objects(&context);
 
                         // Print out any webgl errors
                         if let GfxError::GlErrors(errors) = gl_get_errors(&context)

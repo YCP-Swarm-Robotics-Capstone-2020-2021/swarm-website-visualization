@@ -1,5 +1,15 @@
 use web_sys::WebGlTexture;
-use crate::gfx::{Context, GfxError, gl_object::GlObject, gl_get_errors};
+use crate::gfx::
+{
+    Context,
+    GfxError,
+    gl_get_errors,
+    gl_object::
+    {
+        manager::{GlObjectManager},
+        traits::{Bindable, Reloadable}
+    },
+};
 
 #[derive(Debug, Clone)]
 pub struct TextureParams
@@ -26,7 +36,7 @@ pub struct Texture
 
 impl Texture
 {
-    fn new_texture(context: &Context, target: u32) -> Result<WebGlTexture, GfxError>
+    fn new_texture(context: &Context) -> Result<WebGlTexture, GfxError>
     {
         context.create_texture().ok_or_else(|| GfxError::TextureCreationError(gl_get_errors(&context).to_string()))
     }
@@ -35,7 +45,7 @@ impl Texture
     {
         let texture = Texture
         {
-            internal: Texture::new_texture(&context, params.target)?,
+            internal: Texture::new_texture(&context)?,
             context: context.clone(),
             params
         };
@@ -66,21 +76,21 @@ impl Texture
     }
 }
 
-impl GlObject for Texture
+impl_globject!(Texture);
+
+impl Bindable for Texture
 {
-    fn bind(&self) { self.context.bind_texture(self.params.target, Some(&self.internal)); }
+    fn bind_internal(&self) { self.context.bind_texture(self.params.target, Some(&self.internal)); }
 
-    fn unbind(&self) { self.context.bind_texture(self.params.target, None); }
+    fn unbind_internal(&self) { self.context.bind_texture(self.params.target, None); }
+}
 
-    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
+impl Reloadable for Texture
+{
+    fn reload(&mut self, context: &Context, _manager: &GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
-        self.internal = Texture::new_texture(&context, self.params.target)?;
-        Ok(())
-    }
-
-    fn reload(&mut self) -> Result<(), GfxError>
-    {
+        self.internal = Texture::new_texture(&context)?;
         self.fill_texture()
     }
 }

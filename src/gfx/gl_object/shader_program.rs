@@ -2,7 +2,6 @@ use web_sys::{WebGlProgram, WebGlShader};
 use twox_hash::XxHash32;
 use std::
 {
-    any::{Any, TypeId},
     hash::BuildHasherDefault,
     collections::HashMap,
 };
@@ -11,7 +10,11 @@ use crate::gfx::
     Context,
     GfxError,
     gl_get_errors,
-    gl_object::GlObject,
+    gl_object::
+    {
+        manager::{GlObjectManager},
+        traits::{Bindable, Reloadable},
+    },
 };
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
@@ -178,20 +181,22 @@ impl ShaderProgram
 
 }
 
-impl GlObject for ShaderProgram
+impl_globject!(ShaderProgram);
+
+impl Bindable for ShaderProgram
 {
-    fn bind(&self) { self.context.use_program(Some(&self.internal)); }
-    fn unbind(&self) { self.context.use_program(None); }
-    fn recreate(&mut self, context: &Context) -> Result<(), GfxError>
+    fn bind_internal(&self) { self.context.use_program(Some(&self.internal)); }
+    fn unbind_internal(&self) { self.context.use_program(None); }
+}
+
+impl Reloadable for ShaderProgram
+{
+    fn reload(&mut self, context: &Context, _manager: &GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = ShaderProgram::new_program(&self.context)?;
         self.compile()?;
-        Ok(())
-    }
-    fn reload(&mut self) -> Result<(), GfxError>
-    {
-        self.bind();
+        self.bind_internal();
 
         // Restore all block bindings
         for (block_binding, block_name) in self.block_bindings.to_owned().iter().enumerate()
@@ -217,4 +222,22 @@ impl Drop for ShaderProgram
     {
         self.context.delete_program(Some(&self.internal));
     }
+}
+
+pub mod shader_source
+{
+    #![allow(dead_code)]
+
+    macro_rules! shader_source
+    {
+        ($path:expr) =>
+        {
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), concat!("/", $path)))
+        };
+    }
+    pub const BASIC_VERT: &'static str = shader_source!("shaders/basic_vert.glsl");
+    pub const BASIC_FRAG: &'static str = shader_source!("shaders/basic_frag.glsl");
+
+    pub const TEXTURE_VERT: &'static str = shader_source!("shaders/texture_vert.glsl");
+    pub const TEXTURE_FRAG: &'static str = shader_source!("shaders/texture_frag.glsl");
 }
