@@ -6,8 +6,8 @@ use crate::gfx::
     gl_get_errors,
     gl_object::
     {
-        manager::{GlObjectHandle, GlObjectManager},
-        traits::{GlObject, Bindable, Reloadable}
+        manager::{GlObjectManager},
+        traits::{Bindable, Reloadable}
     },
 };
 
@@ -36,7 +36,7 @@ pub struct Texture
 
 impl Texture
 {
-    fn new_texture(context: &Context, target: u32) -> Result<WebGlTexture, GfxError>
+    fn new_texture(context: &Context) -> Result<WebGlTexture, GfxError>
     {
         context.create_texture().ok_or_else(|| GfxError::TextureCreationError(gl_get_errors(&context).to_string()))
     }
@@ -45,7 +45,7 @@ impl Texture
     {
         let texture = Texture
         {
-            internal: Texture::new_texture(&context, params.target)?,
+            internal: Texture::new_texture(&context)?,
             context: context.clone(),
             params
         };
@@ -87,10 +87,10 @@ impl Bindable for Texture
 
 impl Reloadable for Texture
 {
-    fn reload(&mut self, context: &Context, manager: &GlObjectManager) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context, _manager: &GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
-        self.internal = Texture::new_texture(&context, self.params.target)?;
+        self.internal = Texture::new_texture(&context)?;
         self.fill_texture()
     }
 }

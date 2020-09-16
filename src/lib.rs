@@ -17,17 +17,13 @@ use std::
     rc::Rc,
     cell::RefCell,
     boxed::Box,
-    time::{Duration, SystemTime, UNIX_EPOCH}
+    time::Duration,
 };
 
 #[macro_use]
 mod redeclare;
 #[macro_use]
 extern crate memoffset;
-#[macro_use]
-extern crate downcast_rs;
-#[macro_use]
-extern crate paste;
 
 mod gfx;
 mod input;
@@ -43,10 +39,15 @@ use crate::
         renderer::{vertex::Vertex},
         gl_object::
         {
-            shader_program::{ShaderProgram, ShaderType, shader_source::*},
+            traits::{GlObject, Bindable},
+            shader_program::{ShaderProgram, shader_source::*},
+            buffer::Buffer,
             uniform_buffer::UniformBuffer,
+            ArrayBuffer,
+            ElementArrayBuffer,
             vertex_array::{AttribPointer, VertexArray},
             texture::{Texture, TextureParams},
+            manager::{GlObjectManager},
         }
     },
     input::
@@ -55,14 +56,12 @@ use crate::
         listener::EventListener,
         states::{InputState, InputStateListener},
     },
-    math::transform::{Transformation, SubTransformation},
+    math::transform::{Transformation},
 };
 use cgmath::
 {
     Matrix4,
-    Vector3,
     vec3,
-    Vector4
 };
 
 #[cfg(feature = "wee_alloc")]
@@ -86,7 +85,7 @@ fn log_s(s: String)
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue>
 {
-    /*#[cfg(feature="debug")]
+    #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     let window: Window = window().expect("window context");
@@ -98,11 +97,16 @@ pub fn main() -> Result<(), JsValue>
         };
     let context = new_context(&canvas)?;
 
-    let mut shaderprog =
-        ShaderProgram::new(&context, Some(shadersrc::TEXTURE_VERT.to_string()), Some(shadersrc::TEXTURE_FRAG.to_string()))
+    let manager = Rc::new(RefCell::new(GlObjectManager::new()));
+    let mut manager_ref = manager.borrow_mut();
+
+    let shader_prog =
+        ShaderProgram::new(&context, Some(TEXTURE_VERT.to_string()), Some(TEXTURE_FRAG.to_string()))
             .expect("shader program");
-    shaderprog.bind();
-    shaderprog.set_uniform_i32("tex", &[0]);
+    let shader_progam = manager_ref.insert_shader_program(shader_prog);
+    ShaderProgram::bind(&mut manager_ref, shader_progam);
+    manager_ref.get_mut_shader_program(shader_progam).unwrap().set_uniform_i32("tex", &[0]).expect("tex sampler2d set to 0");
+
     let tex = Texture::new(&context, TextureParams
     {
         target: Context::TEXTURE_2D,
@@ -115,7 +119,10 @@ pub fn main() -> Result<(), JsValue>
         data: vec![253.0 as u8, 94.0 as u8, 0, 255]
     }).expect("texture");
     context.active_texture(Context::TEXTURE0);
-    tex.bind();
+
+    let tex = manager_ref.insert_texture(tex);
+    Texture::bind(&mut manager_ref, tex);
+
     // Triangle point data
     let triangle =
         [
@@ -126,25 +133,33 @@ pub fn main() -> Result<(), JsValue>
     // Triangle point order
     let indices: [u32; 3] = [0, 1, 2];
 
-    let mut va = VertexArray::new(&context).expect("vertex array");
-    va.bind();
+    // VAO setup
+    let mut vao = VertexArray::new(&context).expect("vertex array");
+    vao.bind_internal();
 
-    let mut vb = Buffer::new(&context, Context::ARRAY_BUFFER).expect("array buffer");
-    vb.bind();
+    // Array buffer setup
+    let mut arr_buff = ArrayBuffer::new(&context).expect("array buffer");
+    arr_buff.bind_internal();
 
-    vb.buffer_data(&triangle, Context::STATIC_DRAW);
+    arr_buff.buffer_data(&triangle, Context::STATIC_DRAW);
     let attribs = vec![
         AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, pos) as i32),
         AttribPointer::without_defaults(1, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, tex) as i32),
     ];
-    let _vb = va.add_buffer(vb, Some(attribs));
+    let arr_buff = manager_ref.insert_array_buffer(arr_buff);
+    vao.register_array_buffer(arr_buff, Some(attribs));
 
-    let mut eb = Buffer::new(&context, Context::ELEMENT_ARRAY_BUFFER).expect("element array buffer");
-    eb.bind();
-    eb.buffer_data(&indices, Context::STATIC_DRAW);
-    let _eb = va.add_buffer(eb, None);
+    // Element array buffer setup
+    let mut elem_arr_buff = ElementArrayBuffer::new(&context).expect("element array buffer");
+    elem_arr_buff.bind_internal();
+    elem_arr_buff.buffer_data(&indices, Context::STATIC_DRAW);
+    let elem_arr_buff = manager_ref.insert_element_array_buffer(elem_arr_buff);
+    vao.register_element_array_buffer(elem_arr_buff, None);
 
-    va.unbind();
+    vao.unbind_internal();
+    manager_ref.get_array_buffer(arr_buff).unwrap().unbind_internal();
+    manager_ref.get_element_array_buffer(elem_arr_buff).unwrap().unbind_internal();
+    let vao = manager_ref.insert_vertex_array(vao);
 
     let mut transformation = Transformation::new();
 
@@ -156,35 +171,27 @@ pub fn main() -> Result<(), JsValue>
         0,
         Context::STATIC_DRAW
     ).expect("uniform buffer handle");
-    uniform_buffer.bind();
-
-    uniform_buffer.add_vert_block(&mut shaderprog, "VertData").expect("VertData bound");
-
+    uniform_buffer.bind_internal();
+    uniform_buffer.add_vert_block(&mut manager_ref.get_mut_shader_program(shader_progam).unwrap(), "VertData").expect("VertData bound");
 
     transformation.global.translate(&vec3(-0.5, 0.0, 0.0));
     let buff: &[f32; 16] = transformation.matrix().as_ref();
     uniform_buffer.buffer_vert_data(buff);
 
+    uniform_buffer.unbind_internal();
+    let uniform_buffer = manager_ref.insert_uniform_buffer(uniform_buffer);
+
+    // Release the borrow on the manager
+    drop(manager_ref);
+
     crate::log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
-    wrap!(transformation, shaderprog, uniform_buffer, va, tex);
-
-    // Context container so the context can be updated from within the restored callback
-    // First Rc is to allow the container to be cloned and then moved into the callback
-    // RefCell is for interior mutability
-    let context: Rc<RefCell<Context>> = Rc::new(RefCell::new(context));
-
-    // I feel like this is overly complicated, but I'm not sure of a better way to maintain
-    // a vector of things that need to be reloaded while allowing them to be used
-    // without accessing them through the vector
-    let globjects: Rc<RefCell<Vec<Rc<RefCell<dyn GlObject>>>>> = Rc::new(RefCell::new(
-        vec![shaderprog.clone(), uniform_buffer.clone(), va.clone(), tex.clone()]
-    ));
+    wrap!(context);
 
     let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
     let render_func =
         {
-            clone!(context, transformation, uniform_buffer, input_listener);
+            clone!(context, manager);
             let mut dir: f32 = 1.0;
             let speed: f32 = 1.0;
             let performance = window.performance().expect("performance");
@@ -200,8 +207,6 @@ pub fn main() -> Result<(), JsValue>
                     let elapsed_time = now_time - last_time;
                     last_time = now_time;
                     let elapsed_time = elapsed_time.as_secs_f32();
-
-                    borrow_mut!(transformation, uniform_buffer);
 
                     transformation.global.translate(&vec3(speed * elapsed_time * dir, 0.0, 0.0));
 
@@ -225,14 +230,22 @@ pub fn main() -> Result<(), JsValue>
                         dir *= -1.0;
                     }
                     let buff: &[f32; 16] = transformation.matrix().as_ref();
-                    uniform_buffer.buffer_vert_data(buff);
+                    {
+                        borrow_mut!(manager);
+                        UniformBuffer::bind(&mut manager, uniform_buffer);
+                        {
+                            let mut uniform_buffer = manager.get_mut_uniform_buffer(uniform_buffer).expect("uniform buffer");
+                            uniform_buffer.buffer_vert_data(buff);
+                        }
+                        VertexArray::bind(&mut manager, vao);
+                    }
 
-                    let context = context.borrow();
-                    context.clear_color(0.0, 0.0, 0.0, 1.0);
-                    context.clear(Context::COLOR_BUFFER_BIT);
-
-                    va.borrow().bind();
-                    context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
+                    {
+                        borrow!(context);
+                        context.clear_color(0.0, 0.0, 0.0, 1.0);
+                        context.clear(Context::COLOR_BUFFER_BIT);
+                        context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
+                    }
 
                     let state = input_listener.key_state(Key_a);
                     if state == InputState::Down
@@ -247,7 +260,7 @@ pub fn main() -> Result<(), JsValue>
         };
 
 
-    let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &globjects, render_func).expect("render_loop")));
+    let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func).expect("render_loop")));
     //render_loop.borrow_mut().start().unwrap();
 
     {
@@ -272,7 +285,7 @@ pub fn main() -> Result<(), JsValue>
             };
         let ev = EventListener::new(&canvas, "keydown", callback).expect("event listener registered");
         ev.forget();
-    }*/
+    }
 
     Ok(())
 }

@@ -1,24 +1,19 @@
-use gen_vec::{Index, exposed::{IndexAllocator, ExposedGenVec}, closed::ClosedGenVec};
+use gen_vec::{Index, closed::ClosedGenVec};
 use std::
 {
-    collections::HashMap,
-    hash::BuildHasherDefault,
-    any::TypeId,
     cell::
     {
-        Cell,
         RefCell,
         Ref,
         RefMut,
     },
 };
-use twox_hash::XxHash32;
 
 use crate::gfx::
 {
     Context,
     GfxError,
-    gl_object::traits::{GlObject, Bindable, Reloadable},
+    gl_object::traits::{Bindable, Reloadable},
 };
 
 /// Defines and implements a new struct instance manager.
@@ -55,49 +50,55 @@ macro_rules! define_manager
             }
 
             $(
+            #[allow(dead_code)]
             pub fn [<insert_ $managed_struct:snake>](&mut self, [<$managed_struct:snake>]: $module_path::$managed_struct) -> [<$handle_name:camel>]
             {
                 self.[<$managed_struct:snake s>].insert(RefCell::new([<$managed_struct:snake>]))
             }
-            pub(in crate::gfx::gl_object) fn [<get_ $managed_struct:snake>](&self, handle: [<$handle_name:camel>]) -> Option<Ref<$module_path::$managed_struct>>
+            #[allow(dead_code)]
+            pub fn [<get_ $managed_struct:snake>](&self, handle: [<$handle_name:camel>]) -> Option<Ref<$module_path::$managed_struct>>
             {
                 Some(self.[<$managed_struct:snake s>].get(handle)?.borrow())
             }
-            pub(in crate::gfx::gl_object) fn [<get_mut_ $managed_struct:snake>](&self, handle: [<$handle_name:camel>]) -> Option<RefMut<$module_path::$managed_struct>>
+            #[allow(dead_code)]
+            pub fn [<get_mut_ $managed_struct:snake>](&self, handle: [<$handle_name:camel>]) -> Option<RefMut<$module_path::$managed_struct>>
             {
                 Some(self.[<$managed_struct:snake s>].get(handle)?.borrow_mut())
             }
-            pub(in crate::gfx::gl_object) fn [<remove_ $managed_struct:snake>](&mut self, handle: [<$handle_name:camel>])
+            #[allow(dead_code)]
+            pub fn [<remove_ $managed_struct:snake>](&mut self, handle: [<$handle_name:camel>])
             {
                 self.[<$managed_struct:snake s>].remove(handle);
             }
-            pub(in crate::gfx::gl_object) fn [<bind_ $managed_struct:snake>](&mut self, handle: Option<[<$handle_name:camel>]>) -> Result<(), GfxError>
+            #[allow(dead_code)]
+            pub(in crate::gfx::gl_object) fn [<bind_ $managed_struct:snake>](&mut self, handle: [<$handle_name:camel>], bound: bool) -> Result<(), GfxError>
             {
-                if let Some(handle) = handle
+                if let Some(obj) = self.[<$managed_struct:snake s>].get(handle)
                 {
-                    if let Some(obj) = self.[<$managed_struct:snake s>].get(handle)
+                    if bound && self.[<bound_ $managed_struct:snake>] != Some(handle)
                     {
                         self.[<bound_ $managed_struct:snake>] = Some(handle);
                         obj.borrow().bind_internal();
                     }
-                    else
+                    else if !bound && self.[<bound_ $managed_struct:snake>] != None
                     {
-                        return Err(GfxError::InvalidHandle(handle))
+                        self.[<bound_ $managed_struct:snake>] = None;
+                        obj.borrow().unbind_internal();
                     }
                 }
                 else
                 {
-                    self.[<bound_ $managed_struct:snake>] = handle;
+                    return Err(GfxError::InvalidHandle(handle))
                 }
 
                 Ok(())
             }
             )+
-
+            #[allow(dead_code)]
             pub fn reload_objects(&self, context: &Context)
             {
                 $(
-                for (_, obj) in &self.[<$managed_struct:snake s>] { obj.borrow_mut().reload(&context, &self); }
+                for (_, obj) in &self.[<$managed_struct:snake s>] { obj.borrow_mut().reload(&context, &self).expect(concat!(stringify!([<$managed_struct:snake s>]), " reloaded")); }
                 )+
 
                 $(

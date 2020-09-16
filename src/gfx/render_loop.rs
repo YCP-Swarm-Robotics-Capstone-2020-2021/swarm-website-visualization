@@ -53,7 +53,7 @@ impl RenderLoop
         window: &Window,
         canvas: &HtmlCanvasElement,
         context: &Rc<RefCell<Context>>,
-        gl_objects: &Rc<RefCell<GlObjectManager>>,
+        globject_manager: &Rc<RefCell<GlObjectManager>>,
         render_func: T
     ) -> Result<RenderLoop, GfxError>
     {
@@ -65,7 +65,7 @@ impl RenderLoop
             context_lost_ev: None,
             context_restored_ev: None,
             valid_context: Rc::new(RefCell::new(true)),
-            globject_manager: gl_objects.clone(),
+            globject_manager: globject_manager.clone(),
             running: Rc::new(RefCell::new(false)),
             raf_callback: Rc::new(RefCell::new(None)),
             raf_handle: Rc::new(RefCell::new(-1)),

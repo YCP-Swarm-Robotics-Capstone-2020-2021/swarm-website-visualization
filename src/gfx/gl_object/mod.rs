@@ -5,7 +5,7 @@ pub mod manager;
 //pub mod buffer_old;
 #[macro_use]
 pub mod buffer;
-use traits::{GlObject, Bindable, Reloadable};
+use traits::{Bindable};
 use buffer::Buffer;
 impl_buffer!(ARRAY_BUFFER, ArrayBuffer);
 impl_buffer!(ELEMENT_ARRAY_BUFFER, ElementArrayBuffer);

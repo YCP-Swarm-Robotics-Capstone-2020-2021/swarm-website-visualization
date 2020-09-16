@@ -8,11 +8,11 @@ use crate::gfx::
     gl_object::
     {
         manager::{GlObjectHandle, GlObjectManager},
-        traits::{GlObject, Bindable, Reloadable},
+        traits::{Bindable, Reloadable},
     },
 };
 use web_sys::WebGlVertexArrayObject;
-use gen_vec::{Index, exposed::{IndexAllocator, ExposedGenVec}};
+use gen_vec::{exposed::ExposedGenVec};
 
 #[derive(Debug, Copy, Clone)]
 pub struct AttribPointer

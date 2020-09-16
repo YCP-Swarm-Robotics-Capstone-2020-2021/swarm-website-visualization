@@ -2,7 +2,6 @@ use web_sys::{WebGlProgram, WebGlShader};
 use twox_hash::XxHash32;
 use std::
 {
-    any::{Any, TypeId},
     hash::BuildHasherDefault,
     collections::HashMap,
 };
@@ -13,8 +12,8 @@ use crate::gfx::
     gl_get_errors,
     gl_object::
     {
-        manager::{GlObjectHandle, GlObjectManager},
-        traits::{GlObject, Bindable, Reloadable},
+        manager::{GlObjectManager},
+        traits::{Bindable, Reloadable},
     },
 };
 
@@ -192,7 +191,7 @@ impl Bindable for ShaderProgram
 
 impl Reloadable for ShaderProgram
 {
-    fn reload(&mut self, context: &Context, manager: &GlObjectManager) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context, _manager: &GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = ShaderProgram::new_program(&self.context)?;
@@ -227,14 +226,15 @@ impl Drop for ShaderProgram
 
 pub mod shader_source
 {
+    #![allow(dead_code)]
+
     macro_rules! shader_source
     {
-    ($path:expr) =>
-    {
-        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), concat!("/", $path)))
+        ($path:expr) =>
+        {
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), concat!("/", $path)))
+        };
     }
-}
-
     pub const BASIC_VERT: &'static str = shader_source!("shaders/basic_vert.glsl");
     pub const BASIC_FRAG: &'static str = shader_source!("shaders/basic_frag.glsl");
 

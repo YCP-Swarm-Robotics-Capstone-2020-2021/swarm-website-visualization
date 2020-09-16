@@ -72,10 +72,9 @@ macro_rules! impl_buffer
         impl_buffer!($buffer_type, $struct_name {});
         impl $struct_name
         {
-            pub fn new(context: &crate::gfx::Context, manager: &mut crate::gfx::gl_object::manager::GlObjectManager) -> Result<crate::gfx::gl_object::manager::GlObjectHandle, crate::gfx::GfxError>
+            pub fn new(context: &crate::gfx::Context) -> Result<$struct_name, crate::gfx::GfxError>
             {
-                let buffer = impl_buffer!(@init_struct context, $struct_name {});
-                Ok(manager.[<insert_ $struct_name:snake:lower>](buffer))
+                Ok(impl_buffer!(@init_struct context, $struct_name {}))
             }
         }
     }};
@@ -165,7 +164,7 @@ macro_rules! impl_buffer
 
             impl crate::gfx::gl_object::traits::Reloadable for $struct_name
             {
-                fn reload(&mut self, context: &crate::gfx::Context, manager: &crate::gfx::gl_object::manager::GlObjectManager) -> Result<(), crate::gfx::GfxError>
+                fn reload(&mut self, context: &crate::gfx::Context, _manager: &crate::gfx::gl_object::manager::GlObjectManager) -> Result<(), crate::gfx::GfxError>
                 {
                     self.context = context.clone();
                     self.internal = impl_buffer!(@new_internal context)?;

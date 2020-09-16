@@ -30,12 +30,12 @@ macro_rules! impl_globject
         {
             fn bind(manager: &mut crate::gfx::gl_object::manager::GlObjectManager, handle: crate::gfx::gl_object::manager::GlObjectHandle) where Self: Sized
             {
-                manager.[<bind_ $implementor:snake>](Some(handle)).expect(concat!(stringify!($implementor), " bound"));
+                manager.[<bind_ $implementor:snake>](handle, true).expect(concat!(stringify!($implementor), " bound"));
             }
 
             fn unbind(manager: &mut crate::gfx::gl_object::manager::GlObjectManager, handle: crate::gfx::gl_object::manager::GlObjectHandle) where Self: Sized
             {
-                manager.[<bind_ $implementor:snake>](None).expect(concat!(stringify!($implementor), " unbound"));
+                manager.[<bind_ $implementor:snake>](handle, false).expect(concat!(stringify!($implementor), " unbound"));
             }
         }
     }}

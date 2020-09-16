@@ -53,7 +53,7 @@ impl InputStateListener
         };
 
         // keydown listener
-        let ev = EventListener::new(&target, "keydown",
+        let ev = EventListener::new(&manager.target, "keydown",
                                     {
                                         clone!(manager.keys);
                                         move |event: web_sys::KeyboardEvent|
@@ -71,7 +71,7 @@ impl InputStateListener
         manager.listeners.push(ev);
 
         // keyup listener
-        let ev = EventListener::new(&target, "keyup",
+        let ev = EventListener::new(&manager.target, "keyup",
                                     {
                                         clone!(manager.keys);
                                         move |event: web_sys::KeyboardEvent| { keys.borrow_mut().insert(event.key(), InputState::Up); }
@@ -79,7 +79,7 @@ impl InputStateListener
         manager.listeners.push(ev);
 
         // mouseup listener
-        let ev = EventListener::new(&target, "mouseup",
+        let ev = EventListener::new(&manager.target, "mouseup",
                                     {
                                         clone!(manager.mouse_buttons);
                                         move |event: web_sys::MouseEvent|
@@ -94,7 +94,7 @@ impl InputStateListener
         manager.listeners.push(ev);
 
         // mousedown listener
-        let ev = EventListener::new(&target, "mousedown",
+        let ev = EventListener::new(&manager.target, "mousedown",
                                     {
                                         clone!(manager.mouse_buttons);
                                         move |event: web_sys::MouseEvent|
@@ -109,7 +109,7 @@ impl InputStateListener
         manager.listeners.push(ev);
 
         // mousemove listener
-        let ev = EventListener::new(&target, "mousemove",
+        let ev = EventListener::new(&manager.target, "mousemove",
                                     {
                                         clone!(manager.curr_mouse_pos, manager.last_mouse_pos);
                                         move |event: web_sys::MouseEvent|
@@ -124,6 +124,7 @@ impl InputStateListener
     }
 
     /// Get the current state of `key`
+    #[allow(dead_code)]
     pub fn key_state(&self, key: &str) -> InputState
     {
         // If `key` is not in the internal hashmap, it has not
@@ -135,6 +136,7 @@ impl InputStateListener
 
     /// Get the current state of `button`
     /// Will panic if `button` is not a valid mouse button
+    #[allow(dead_code)]
     pub fn mouse_btn_state(&self, button: usize) -> InputState
     {
         self.mouse_buttons.borrow()[button]
@@ -142,6 +144,7 @@ impl InputStateListener
 
     /// Current mouse position
     /// 0,0 is top left of `target` element
+    #[allow(dead_code)]
     pub fn curr_mouse_pos(&self) -> (i32, i32)
     {
         self.curr_mouse_pos.get()
@@ -149,6 +152,7 @@ impl InputStateListener
 
     /// Last mouse position
     /// 0,0 is top left of `target` element
+    #[allow(dead_code)]
     pub fn last_mouse_pos(&self) -> (i32, i32)
     {
         self.last_mouse_pos.get()
