@@ -46,7 +46,6 @@ use crate::
             shader_program::{ShaderProgram, ShaderType, shader_source::*},
             uniform_buffer::UniformBuffer,
             vertex_array::{AttribPointer, VertexArray},
-            buffer::Buffer,
             texture::{Texture, TextureParams},
         }
     },

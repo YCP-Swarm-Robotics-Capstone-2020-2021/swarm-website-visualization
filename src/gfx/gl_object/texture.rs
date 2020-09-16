@@ -76,7 +76,7 @@ impl Texture
     }
 }
 
-impl GlObject for Texture {}
+impl_globject!(Texture);
 
 impl Bindable for Texture
 {
@@ -87,7 +87,7 @@ impl Bindable for Texture
 
 impl Reloadable for Texture
 {
-    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context, manager: &GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = Texture::new_texture(&context, self.params.target)?;

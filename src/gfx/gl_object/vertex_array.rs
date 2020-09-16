@@ -9,7 +9,6 @@ use crate::gfx::
     {
         manager::{GlObjectHandle, GlObjectManager},
         traits::{GlObject, Bindable, Reloadable},
-        buffer::Buffer,
     },
 };
 use web_sys::WebGlVertexArrayObject;
@@ -58,7 +57,8 @@ pub struct VertexArray
 {
     internal: WebGlVertexArrayObject,
     context: Context,
-    attrib_ptrs: ExposedGenVec<Option<Vec<AttribPointer>>>
+    array_buffer_attribs: ExposedGenVec<Option<Vec<AttribPointer>>>,
+    element_array_buffer_attribs: ExposedGenVec<Option<Vec<AttribPointer>>>
 }
 
 impl VertexArray
@@ -75,19 +75,31 @@ impl VertexArray
         {
             internal: VertexArray::new_vertex_array(&context)?,
             context: context.clone(),
-            attrib_ptrs: ExposedGenVec::new(),
+            array_buffer_attribs: ExposedGenVec::new(),
+            element_array_buffer_attribs: ExposedGenVec::new(),
         })
     }
 
-    /// Registers `buffer` to this `VertexArray` with the given `AttribPointer`s, if any
+    /// Registers the array buffer `buffer` to this `VertexArray` with the given `AttribPointer`s, if any
     /// The target buffer MUST be bound directly before calling this function
-    pub fn register_buffer(&mut self, handle: GlObjectHandle, attrib_ptrs: Option<Vec<AttribPointer>>)
+    pub fn register_array_buffer(&mut self, handle: GlObjectHandle, attrib_ptrs: Option<Vec<AttribPointer>>)
     {
         if let Some(attrib_ptrs) = &attrib_ptrs
         {
             self.set_attrib_ptrs(&attrib_ptrs);
         }
-        self.attrib_ptrs.set(handle, attrib_ptrs);
+        self.array_buffer_attribs.set(handle, attrib_ptrs);
+    }
+
+    /// Registers the element buffer `buffer` to this `VertexArray` with the given `AttribPointer`s, if any
+    /// The target buffer MUST be bound directly before calling this function
+    pub fn register_element_array_buffer(&mut self, handle: GlObjectHandle, attrib_ptrs: Option<Vec<AttribPointer>>)
+    {
+        if let Some(attrib_ptrs) = &attrib_ptrs
+        {
+            self.set_attrib_ptrs(&attrib_ptrs);
+        }
+        self.element_array_buffer_attribs.set(handle, attrib_ptrs);
     }
 
     fn set_attrib_ptrs(&self, attrib_ptrs: &Vec<AttribPointer>)
@@ -100,13 +112,19 @@ impl VertexArray
     }
 
     #[allow(dead_code)]
-    pub fn unregister_buffer(&mut self, handle: GlObjectHandle)
+    pub fn unregister_array_buffer(&mut self, handle: GlObjectHandle)
     {
-        self.attrib_ptrs.remove(handle);
+        self.array_buffer_attribs.remove(handle);
+    }
+
+    #[allow(dead_code)]
+    pub fn unregister_element_array_buffer(&mut self, handle: GlObjectHandle)
+    {
+        self.element_array_buffer_attribs.remove(handle);
     }
 }
 
-impl_globject!(vertex_array, VertexArray);
+impl_globject!(VertexArray);
 
 impl Bindable for VertexArray
 {
@@ -122,22 +140,25 @@ impl Bindable for VertexArray
 
 impl Reloadable for VertexArray
 {
-    fn reload(&mut self, context: &Context, manager: &mut GlObjectManager) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context, manager: &GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = VertexArray::new_vertex_array(&self.context)?;
         self.bind_internal();
 
-        for (handle, attrib_ptrs) in &self.attrib_ptrs
+        for (handle, attrib_ptrs) in &self.array_buffer_attribs
         {
-            manager.get(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?.borrow().bind_internal();
-            self.set_attrib_ptrs(&attrib_ptrs)
+            manager.get_array_buffer(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?.bind_internal();
+            if let Some(attrib_ptrs) = attrib_ptrs
+            {
+                self.set_attrib_ptrs(&attrib_ptrs);
+            }
         }
 
-        for index in self.allocator.iter()
+        for (handle, attrib_ptrs) in &self.element_array_buffer_attribs
         {
-            self.buffers.get_mut(index).ok_or_else(|| GfxError::InvalidHandle(index))?.reload(&self.context)?;
-            if let Some(attrib_ptrs) = self.attrib_ptrs.get(index).ok_or_else(|| GfxError::InvalidHandle(index))?
+            manager.get_element_array_buffer(handle).ok_or_else(|| GfxError::InvalidHandle(handle))?.bind_internal();
+            if let Some(attrib_ptrs) = attrib_ptrs
             {
                 self.set_attrib_ptrs(&attrib_ptrs);
             }

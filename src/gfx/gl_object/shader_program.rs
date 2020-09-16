@@ -182,7 +182,7 @@ impl ShaderProgram
 
 }
 
-impl GlObject for ShaderProgram { }
+impl_globject!(ShaderProgram);
 
 impl Bindable for ShaderProgram
 {
@@ -192,7 +192,7 @@ impl Bindable for ShaderProgram
 
 impl Reloadable for ShaderProgram
 {
-    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
+    fn reload(&mut self, context: &Context, manager: &GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
         self.internal = ShaderProgram::new_program(&self.context)?;

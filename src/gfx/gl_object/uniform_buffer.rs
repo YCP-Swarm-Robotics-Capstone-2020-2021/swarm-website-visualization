@@ -4,7 +4,7 @@ use crate::gfx::
     GfxError,
     gl_object::
     {
-        manager::{GlObjectHandle, GlObjectManager, GlObjectType},
+        manager::{GlObjectHandle, GlObjectManager},
         traits::{GlObject, Bindable, Reloadable},
         buffer::Buffer,
         shader_program::ShaderProgram,
@@ -51,11 +51,9 @@ fn align(context: &Context, size: i32) -> i32
 /// Atomic counter for generating new uniform block bindings
 static BLOCK_BINDINGS: AtomicU32 = AtomicU32::new(0);
 
-pub struct UniformBuffer
+impl_buffer!(UNIFORM_BUFFER,
+UniformBuffer
 {
-    //buffer: GlObjectHandle,
-    buffer: Buffer,
-
     vert_size: i32,
     frag_size: i32,
 
@@ -64,89 +62,55 @@ pub struct UniformBuffer
 
     vert_binding: Option<u32>,
     frag_binding: Option<u32>
-}
+});
 
 impl UniformBuffer
 {
-/*    pub fn new(context: &Context, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<UniformBuffer, GfxError>
+    pub fn new(context: &Context, manager: &mut GlObjectManager, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<GlObjectHandle, GfxError>
     {
         let vert_size = align(&context, vert_size);
         // not necessary to align frag size since it isn't used as an offset
         //let frag_size = align(&context, frag_size);
 
-        Ok(UniformBuffer
+        let ub = impl_buffer!(@init_struct context, UniformBuffer
         {
-            buffer:
-            {
-                let mut buffer = Buffer::new(&context, Context::UNIFORM_BUFFER)?;
-                buffer.bind_internal();
-                buffer.buffer_data_raw(&vec![0u8; (vert_size + frag_size) as usize], draw_type);
-                buffer
-            },
-            vert_size,
-            frag_size,
+            vert_size: vert_size,
+            frag_size: frag_size,
 
             vert_offset: 0,
             frag_offset: vert_size,
 
             vert_binding: None,
             frag_binding: None
-        })
-    }*/
+        });
 
-/*    pub fn new_(context: &Context, manager: &mut GlObjectManager, vert_size: i32, frag_size: i32, draw_type: u32) -> Result<GlObjectHandle, GfxError>
-    {
-        let vert_size = align(&context, vert_size);
-        // not necessary to align frag size since it isn't used as an offset
-        //let frag_size = align(&context, frag_size);
-
-        let ub = UniformBuffer
-        {
-            buffer:
-            {
-                let buffer_handle = Buffer::new(&context, &mut manager, Context::UNIFORM_BUFFER)?;
-                Buffer::bind(&manager, buffer_handle);
-                let buffer = manager.get_mut::<Buffer>(buffer_handle).unwrap();
-                buffer.buffer_data_raw(&vec![0u8; (vert_size + frag_size) as usize], draw_type);
-                buffer_handle
-            },
-            vert_size,
-            frag_size,
-
-            vert_offset: 0,
-            frag_offset: vert_size,
-
-            vert_binding: None,
-            frag_binding: None
-        };
-
-        Ok(manager.insert(ub, GlObjectType::Buffer(Context::UNIFORM_BUFFER)))
-    }*/
+        Ok(manager.insert_uniform_buffer(ub))
+    }
 
     /// Set `data` as the contents of the vertex shader uniform block
     pub fn buffer_vert_data<T>(&mut self, data: &[T])
     {
-        self.buffer.buffer_sub_data(self.vert_offset, &data);
+        self.buffer_sub_data(self.vert_offset, &data);
     }
 
     /// Set `data` as the contents of the vertex shader uniform block, starting at `offset`
     #[allow(dead_code)]
     pub fn buffer_vert_data_with_offset<T>(&mut self, offset: i32, data: &[T])
     {
-        self.buffer.buffer_sub_data(self.vert_offset+offset, &data)
+        self.buffer_sub_data(self.vert_offset+offset, &data)
     }
 
     /// Set `data` as the contents of the fragment shader uniform block
     pub fn buffer_frag_data<T>(&mut self, data: &[T])
     {
-        self.buffer.buffer_sub_data(self.frag_offset, &data);
+        self.buffer_sub_data(self.frag_offset, &data);
     }
 
     /// Set `data` as the contents of the fragment shader uniform block, starting at `offset`
     #[allow(dead_code)]
     pub fn buffer_frag_data_with_offset<T>(&mut self, offset: i32, data: &[T])
     {
-        self.buffer.buffer_sub_data(self.frag_offset+offset, &data);
+        self.buffer_sub_data(self.frag_offset+offset, &data);
     }
 
     /// Register a vertex shader uniform block of `block_name` from within `shader_program` to this uniform buffer
@@ -157,8 +121,8 @@ impl UniformBuffer
             self.vert_binding = Some(BLOCK_BINDINGS.fetch_add(1, Ordering::Relaxed));
         }
         shader_program.add_uniform_block_binding(block_name, self.vert_binding.unwrap())?;
-        self.buffer.bind_internal();
-        self.buffer.bind_range(self.vert_binding.unwrap(), self.vert_offset, self.vert_size);
+        self.bind_internal();
+        self.bind_range(self.vert_binding.unwrap(), self.vert_offset, self.vert_size);
         Ok(())
     }
 
@@ -170,31 +134,8 @@ impl UniformBuffer
             self.frag_binding = Some(BLOCK_BINDINGS.fetch_add(1, Ordering::Relaxed));
         }
         shader_program.add_uniform_block_binding(block_name, self.frag_binding.unwrap())?;
-        self.buffer.bind_internal();
-        self.buffer.bind_range(self.frag_binding.unwrap(), self.frag_offset, self.frag_size);
+        self.bind_internal();
+        self.bind_range(self.frag_binding.unwrap(), self.frag_offset, self.frag_size);
         Ok(())
     }
-}
-
-impl GlObject for UniformBuffer
-{
-}
-
-impl Bindable for UniformBuffer
-{
-    fn bind_internal(&self) { self.buffer.bind_internal(); }
-    fn unbind_internal(&self) { self.buffer.unbind_internal(); }
-}
-
-impl Reloadable for UniformBuffer
-{
-    fn reload(&mut self, context: &Context) -> Result<(), GfxError>
-    {
-        self.buffer.reload(&context)
-    }
-}
-
-impl Drop for UniformBuffer
-{
-    fn drop(&mut self) {}
 }
