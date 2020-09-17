@@ -46,7 +46,7 @@ use crate::
             ArrayBuffer,
             ElementArrayBuffer,
             vertex_array::{AttribPointer, VertexArray},
-            texture::{Texture, TextureParams},
+            texture::{Texture2d, Texture2dParams},
             manager::{GlObjectManager},
         }
     },
@@ -107,7 +107,7 @@ pub fn main() -> Result<(), JsValue>
     ShaderProgram::bind(&mut manager_ref, shader_progam);
     manager_ref.get_mut_shader_program(shader_progam).unwrap().set_uniform_i32("tex", &[0]).expect("tex sampler2d set to 0");
 
-    let tex = Texture::new(&context, TextureParams
+    let tex = Texture2d::new(&context, Texture2dParams
     {
         target: Context::TEXTURE_2D,
         format: Context::RGBA,
@@ -120,8 +120,8 @@ pub fn main() -> Result<(), JsValue>
     }).expect("texture");
     context.active_texture(Context::TEXTURE0);
 
-    let tex = manager_ref.insert_texture(tex);
-    Texture::bind(&mut manager_ref, tex);
+    let tex = manager_ref.insert_texture2d(tex);
+    Texture2d::bind(&mut manager_ref, tex);
 
     // Triangle point data
     let triangle =

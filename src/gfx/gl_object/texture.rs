@@ -12,7 +12,7 @@ use crate::gfx::
 };
 
 #[derive(Debug, Clone)]
-pub struct TextureParams
+pub struct Texture2dParams
 {
     // Target texture, i.e. GL_TEXTURE_2D
     pub target: u32,
@@ -27,25 +27,25 @@ pub struct TextureParams
     // Image data
     pub data: Vec<u8>,
 }
-pub struct Texture
+pub struct Texture2d
 {
     internal: WebGlTexture,
     context: Context,
-    params: TextureParams
+    params: Texture2dParams
 }
 
-impl Texture
+impl Texture2d
 {
     fn new_texture(context: &Context) -> Result<WebGlTexture, GfxError>
     {
         context.create_texture().ok_or_else(|| GfxError::TextureCreationError(gl_get_errors(&context).to_string()))
     }
 
-    pub fn new(context: &Context, params: TextureParams) -> Result<Texture, GfxError>
+    pub fn new(context: &Context, params: Texture2dParams) -> Result<Texture2d, GfxError>
     {
-        let texture = Texture
+        let texture = Texture2d
         {
-            internal: Texture::new_texture(&context)?,
+            internal: Texture2d::new_texture(&context)?,
             context: context.clone(),
             params
         };
@@ -76,26 +76,26 @@ impl Texture
     }
 }
 
-impl_globject!(Texture);
+impl_globject!(Texture2d);
 
-impl Bindable for Texture
+impl Bindable for Texture2d
 {
     fn bind_internal(&self) { self.context.bind_texture(self.params.target, Some(&self.internal)); }
 
     fn unbind_internal(&self) { self.context.bind_texture(self.params.target, None); }
 }
 
-impl Reloadable for Texture
+impl Reloadable for Texture2d
 {
     fn reload(&mut self, context: &Context, _manager: &GlObjectManager) -> Result<(), GfxError>
     {
         self.context = context.clone();
-        self.internal = Texture::new_texture(&context)?;
+        self.internal = Texture2d::new_texture(&context)?;
         self.fill_texture()
     }
 }
 
-impl Drop for Texture
+impl Drop for Texture2d
 {
     fn drop(&mut self)
     {

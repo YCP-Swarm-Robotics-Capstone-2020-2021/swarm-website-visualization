@@ -118,7 +118,7 @@ define_manager!(GlObjectManager, GlObjectHandle;
     crate::gfx::gl_object => ArrayBuffer,
     crate::gfx::gl_object => ElementArrayBuffer,
     crate::gfx::gl_object::shader_program => ShaderProgram,
-    crate::gfx::gl_object::texture => Texture,
+    crate::gfx::gl_object::texture => Texture2d,
     crate::gfx::gl_object::uniform_buffer => UniformBuffer,
     crate::gfx::gl_object::vertex_array => VertexArray
 );
