@@ -71,7 +71,7 @@ macro_rules! define_manager
                 self.[<$managed_struct:snake s>].remove(handle);
             }
             #[allow(dead_code)]
-            pub(in crate::gfx::gl_object) fn [<bind_ $managed_struct:snake>](&mut self, handle: [<$handle_name:camel>], bound: bool) -> Result<(), GfxError>
+            pub fn [<bind_ $managed_struct:snake>](&mut self, handle: [<$handle_name:camel>], bound: bool) -> Result<(), GfxError>
             {
                 if let Some(obj) = self.[<$managed_struct:snake s>].get(handle)
                 {
