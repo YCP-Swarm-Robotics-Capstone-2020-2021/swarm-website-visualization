@@ -261,7 +261,7 @@ pub fn main() -> Result<(), JsValue>
 
 
     let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func).expect("render_loop")));
-    //render_loop.borrow_mut().start().unwrap();
+    render_loop.borrow_mut().start().unwrap();
 
     {
         clone!(context, render_loop);
