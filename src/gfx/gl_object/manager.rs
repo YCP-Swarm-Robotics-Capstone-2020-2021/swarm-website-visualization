@@ -50,26 +50,33 @@ macro_rules! define_manager
             }
 
             $(
+            /// Insert (and move) the given struct into the manager's ownership
+            /// Returns a handle to the object
             #[allow(dead_code)]
             pub fn [<insert_ $managed_struct:snake>](&mut self, [<$managed_struct:snake>]: $module_path::$managed_struct) -> [<$handle_name:camel>]
             {
                 self.[<$managed_struct:snake s>].insert(RefCell::new([<$managed_struct:snake>]))
             }
+            /// Get an immutable reference to the struct associated with `handle` if `handle` is valid
             #[allow(dead_code)]
             pub fn [<get_ $managed_struct:snake>](&self, handle: [<$handle_name:camel>]) -> Option<Ref<$module_path::$managed_struct>>
             {
                 Some(self.[<$managed_struct:snake s>].get(handle)?.borrow())
             }
+            /// Get a mutable reference to the struct associated with `handle` if `handle` is valid
             #[allow(dead_code)]
             pub fn [<get_mut_ $managed_struct:snake>](&self, handle: [<$handle_name:camel>]) -> Option<RefMut<$module_path::$managed_struct>>
             {
                 Some(self.[<$managed_struct:snake s>].get(handle)?.borrow_mut())
             }
+            /// Remove the struct associated with `handle` from the manager's ownership and drop its memory
             #[allow(dead_code)]
             pub fn [<remove_ $managed_struct:snake>](&mut self, handle: [<$handle_name:camel>])
             {
                 self.[<$managed_struct:snake s>].remove(handle);
             }
+            /// Bind the struct associated with `handle`
+            /// `bound` is whether `handle` should be bound or unbound after this function call
             #[allow(dead_code)]
             pub fn [<bind_ $managed_struct:snake>](&mut self, handle: [<$handle_name:camel>], bound: bool) -> Result<(), GfxError>
             {
@@ -94,6 +101,7 @@ macro_rules! define_manager
                 Ok(())
             }
             )+
+            /// Reloads the state of all owned structs and re-binds the previously bound structs
             #[allow(dead_code)]
             pub fn reload_objects(&self, context: &Context)
             {
