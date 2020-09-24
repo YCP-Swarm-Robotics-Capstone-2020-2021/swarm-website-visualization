@@ -58,12 +58,12 @@ impl SubTransformation
     pub fn set_scale(&mut self, scale: Vector3<f32>)
     {
         // Remove the current scale factors from position
-        self.translation.div_assign_element_wise(scale);
+        self.translation.div_assign_element_wise(self.scale);
 
         self.scale = scale;
 
         // Scale the position by the new scale value
-        self.translation.mul_assign_element_wise(scale);
+        self.translation.mul_assign_element_wise(self.scale);
 
         self.has_changed = true;
     }
@@ -135,9 +135,9 @@ impl SubTransformation
     }
 
     #[allow(dead_code)]
-    pub fn set_translation(&mut self, position: Vector3<f32>)
+    pub fn set_translation(&mut self, translation: Vector3<f32>)
     {
-        self.translation = position;
+        self.translation = translation;
 
         self.has_changed = true;
     }
@@ -256,4 +256,153 @@ impl Transformation
     {
         self.global.as_matrix_uncached() * self.local.as_matrix_uncached()
     }
+}
+
+#[cfg(test)]
+mod tests
+{
+    use crate::math::transform::*;
+    use cgmath::prelude::*;
+    use cgmath::Deg;
+
+    const I: [f32; 16] =
+        [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ];
+
+    // TODO: These assertions should be done with some sort of epsilon value,
+    //  because of floating point precision errors while rounding
+
+    #[test]
+    fn init()
+    {
+        let mut t = Transformation::new();
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(I, *m);
+        let m: &[f32; 16] = t.local.as_matrix().as_ref();
+        assert_eq!(I, *m);
+        let m: &[f32; 16] = t.matrix().as_ref();
+        assert_eq!(I, *m);
+
+        assert_eq!(vec3(0.0, 0.0, 0.0), *t.global.get_translation());
+        assert_eq!(vec3(0.0, 0.0, 0.0), *t.local.get_translation());
+
+        assert_eq!(vec3(1.0, 1.0, 1.0), *t.global.get_scale());
+        assert_eq!(vec3(1.0, 1.0, 1.0), *t.local.get_scale());
+
+        assert_eq!(Quaternion::from_axis_angle(vec3(0.0, 0.0, 0.0), Rad(0.0)), *t.global.get_orientation());
+        assert_eq!(Quaternion::from_axis_angle(vec3(0.0, 0.0, 0.0), Rad(0.0)), *t.local.get_orientation());
+    }
+    #[test]
+    fn reset()
+    {
+        let mut t = Transformation::new();
+        t.global.translate(&vec3(1.0, 1.0, 1.0));
+
+        t.reset();
+        let m: &[f32; 16] = t.matrix().as_ref();
+        assert_eq!(I, *m);
+    }
+    #[test]
+    fn scale()
+    {
+        let mut t = Transformation::new();
+
+        // Test scaling on I
+        t.global.scale(&vec3(2.0, 2.0, 2.0));
+        let expected: [f32; 16] = [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+
+        t.reset();
+
+        // Test scaling on transformation with translations
+        t.global.translate(&vec3(1.0, 0.0, 1.0));
+        t.global.scale(&vec3(2.0, 2.0, 2.0));
+        let expected: [f32; 16] = [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 2.0, 0.0, 2.0, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+        assert_eq!(vec3(2.0, 0.0, 2.0), *t.global.get_translation());
+
+        t.global.set_scale(vec3(1.0, 1.0, 1.0));
+        let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+        assert_eq!(vec3(1.0, 0.0, 1.0), *t.global.get_translation());
+
+        // Test scaling on transformation with orientation
+        t.global.rotate_angle_axis(Deg(1.0), &vec3(0.0, 1.0, 0.0));
+        t.global.scale(&vec3(2.0, 1.0, 2.0));
+        let expected: [f32; 16] = [1.9996954, 0.0, -0.03490481, 0.0, 0.0, 1.0, 0.0, 0.0, 0.03490481, 0.0, 1.9996954, 0.0, 2.0346003, 0.0, 1.9647906, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+        // Scaling shouldn't effect rotation by design
+        assert_eq!(Quaternion::from_axis_angle(vec3(0.0, 1.0, 0.0), Deg(1.0)), *t.global.get_orientation());
+
+        t.global.set_scale(vec3(1.0, 1.0, 1.0));
+        let expected: [f32; 16] = [0.9998477, 0.0, -0.017452406, 0.0, 0.0, 1.0, 0.0, 0.0, 0.017452406, 0.0, 0.9998477, 0.0, 1.0173001, 0.0, 0.9823953, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+        // Scaling shouldn't effect rotation by design
+        assert_eq!(Quaternion::from_axis_angle(vec3(0.0, 1.0, 0.0), Deg(1.0)), *t.global.get_orientation());
+    }
+    #[test]
+    fn orientation()
+    {
+        let mut t = Transformation::new();
+
+        // Test orientation on I
+        t.global.rotate_angle_axis(Deg(1.0), &vec3(1.0, 0.0, 1.0));
+        let expected: [f32; 16] = [0.9998477, 0.01745108, 0.00015229327, 0.0, -0.01745108, 0.9996954, 0.01745108, 0.0, 0.00015229327, -0.01745108, 0.9998477, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+
+        t.reset();
+
+        // Test orientation on transformation with translation
+        t.global.translate(&vec3(1.0, 1.0, 0.0));
+        t.global.rotate_angle_axis(Deg(23.0), &vec3(1.0, 0.0, 1.0));
+        let expected: [f32; 16] = [0.9235438, 0.3757942, 0.0764562, 0.0, -0.3757942, 0.8470876, 0.3757942, 0.0, 0.0764562, -0.3757942, 0.9235438, 0.0, 0.5477496, 1.2228818, 0.45225042, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+
+        t.global.set_orientation_angle_axis(Deg(0.0), &vec3(0.0, 0.0, 0.0));
+        let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0000001, 0.9999999, -0.00000011920929, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+
+        t.global.translate(&vec3(-1.0, -1.0, 0.0));
+        assert_eq!(vec3(0.00000011920929, -0.00000011920929, -0.00000011920929), *t.global.get_translation());
+
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        //TODO: These assertions are *technically* true, but fail because of
+        // rounding precision errors
+        //assert_eq!(I, *m);
+        //assert_eq!(vec3(0.0, 0.0, 0.0), *t.global.get_translation());
+    }
+    #[test]
+    fn translation()
+    {
+        let mut t = Transformation::new();
+
+        t.global.translate(&vec3(1.0, 0.0, 3.0));
+        let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 3.0, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+        assert_eq!(vec3(1.0, 0.0, 3.0), *t.global.get_translation());
+
+        t.global.set_translation(vec3(0.0, 0.0, 0.0));
+        let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        assert_eq!(expected, *m);
+        assert_eq!(vec3(0.0, 0.0, 0.0), *t.global.get_translation());
+    }
+/*    #[test]
+    fn caching()
+    {
+
+    }*/
 }
