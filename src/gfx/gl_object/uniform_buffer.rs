@@ -74,9 +74,9 @@ impl UniformBuffer
         let mut ub = impl_buffer!(@init_struct context, UniformBuffer
         {
             vert_size: vert_size,
-            frag_size: frag_size,
-
             vert_offset: 0,
+
+            frag_size: frag_size,
             frag_offset: vert_size,
 
             vert_binding: None,
