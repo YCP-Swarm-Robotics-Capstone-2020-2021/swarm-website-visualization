@@ -58,11 +58,7 @@ use crate::
     },
     math::transform::{Transformation},
 };
-use cgmath::
-{
-    Matrix4,
-    vec3,
-};
+use cgmath::{Matrix4, vec3, Deg, InnerSpace};
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -174,10 +170,6 @@ pub fn main() -> Result<(), JsValue>
     uniform_buffer.bind_internal();
     uniform_buffer.add_vert_block(&mut manager_ref.get_mut_shader_program(shader_progam).unwrap(), "VertData").expect("VertData bound");
 
-    transformation.global.translate(&vec3(-0.5, 0.0, 0.0));
-    let buff: &[f32; 16] = transformation.matrix().as_ref();
-    uniform_buffer.buffer_vert_data(buff);
-
     uniform_buffer.unbind_internal();
     let uniform_buffer = manager_ref.insert_uniform_buffer(uniform_buffer);
 
@@ -193,9 +185,13 @@ pub fn main() -> Result<(), JsValue>
         {
             clone!(context, manager);
             let mut dir: f32 = 1.0;
-            let speed: f32 = 1.0;
+            let speed: f32 = 0.5;
             let performance = window.performance().expect("performance");
             let mut last_time: Duration = Duration::new(0, 0);
+
+            let dt: f32 = 0.01;
+            let mut accumulator: f32 = 0.0;
+            let mut update = false;
 
             move ||
                 {
@@ -206,36 +202,53 @@ pub fn main() -> Result<(), JsValue>
                     let now_time = time(&performance);
                     let elapsed_time = now_time - last_time;
                     last_time = now_time;
-                    let elapsed_time = elapsed_time.as_secs_f32();
-
-                    transformation.global.translate(&vec3(speed * elapsed_time * dir, 0.0, 0.0));
-
-                    let translation =
+                    let elapsed_time =
                         {
-                            let mut t = transformation.global.get_translation().clone();
-                            if dir == -1.0
-                            {
-                                t.x = f32::max(-0.5, t.x);
-                            }
-                            else if dir == 1.0
-                            {
-                                t.x = f32::min(0.5, t.x);
-                            }
-                            t
+                            let time = elapsed_time.as_secs_f32();
+                            if time > 0.25 { 0.25 } else { time }
                         };
 
-                    transformation.global.set_translation(translation);
-                    if transformation.translation().x <= -0.5 || transformation.translation().x >= 0.5
+                    accumulator += elapsed_time;
+
+                    while accumulator >= dt
                     {
-                        dir *= -1.0;
+                        transformation.global.translate(&vec3(speed * dir * dt, 0.0, 0.0));
+                        transformation.local.rotate_angle_axis(Deg(10.0 * dt), &vec3(0.0, 0.0, 1.0));
+
+                        let translation =
+                            {
+                                let mut t = transformation.global.get_translation().clone();
+                                if dir == -1.0
+                                {
+                                    t.x = f32::max(-0.5, t.x);
+                                }
+                                else if dir == 1.0
+                                {
+                                    t.x = f32::min(0.5, t.x);
+                                }
+                                t
+                            };
+
+                        transformation.global.set_translation(translation);
+                        if transformation.translation().x <= -0.5 || transformation.translation().x >= 0.5
+                        {
+                            dir *= -1.0;
+                        }
+
+                        accumulator -= dt;
+                        update = true;
                     }
-                    let buff: &[f32; 16] = transformation.matrix().as_ref();
+
                     {
                         borrow_mut!(manager);
-                        UniformBuffer::bind(&mut manager, uniform_buffer);
+                        if update
                         {
-                            let mut uniform_buffer = manager.get_mut_uniform_buffer(uniform_buffer).expect("uniform buffer");
-                            uniform_buffer.buffer_vert_data(buff);
+                            let buff: &[f32; 16] = transformation.matrix().as_ref();
+                            UniformBuffer::bind(&mut manager, uniform_buffer);
+                            {
+                                let mut uniform_buffer = manager.get_mut_uniform_buffer(uniform_buffer).expect("uniform buffer");
+                                uniform_buffer.buffer_vert_data(buff);
+                            }
                         }
                         VertexArray::bind(&mut manager, vao);
                     }
