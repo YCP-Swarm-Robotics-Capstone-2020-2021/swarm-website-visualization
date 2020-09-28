@@ -36,11 +36,19 @@ use crate::
         Context,
         new_context,
         render_loop::RenderLoop,
-        renderer::{vertex::Vertex},
+        renderer::
+        {
+            renderer2d::
+            {
+                RenderDto,
+                Node,
+                Renderer2D,
+            },
+            vertex::Vertex,
+        },
         gl_object::
         {
             traits::{GlObject, Bindable},
-            shader_program::{ShaderProgram, shader_source::*},
             buffer::Buffer,
             uniform_buffer::UniformBuffer,
             ArrayBuffer,
@@ -48,7 +56,7 @@ use crate::
             vertex_array::{AttribPointer, VertexArray},
             texture::{Texture2d, Texture2dParams},
             manager::{GlObjectManager},
-        }
+        },
     },
     input::
     {
@@ -78,12 +86,22 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
+const TRIANGLE_VERTICESS: [Vertex; 3] =
+    [
+        Vertex { pos: [-0.5, -0.5, 0.0], tex: [0.0, 0.0] },
+        Vertex { pos: [ 0.5, -0.5, 0.0], tex: [1.0, 0.0] },
+        Vertex { pos: [ 0.0,  0.5, 0.0], tex: [0.5, 1.0] }
+    ];
+const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
+
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue>
 {
+    // Allow panics to print to javascript console if debug build
     #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
+    // Get HTML element references
     let window: Window = window().expect("window context");
     let document: Document = window.document().expect("document context");
     let canvas =
@@ -93,112 +111,131 @@ pub fn main() -> Result<(), JsValue>
         };
     let context = new_context(&canvas)?;
 
+    // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
     let mut manager_ref = manager.borrow_mut();
 
-    let shader_prog =
-        ShaderProgram::new(&context, Some(TEXTURE_VERT.to_string()), Some(TEXTURE_FRAG.to_string()))
-            .expect("shader program");
-    let shader_progam = manager_ref.insert_shader_program(shader_prog);
-    ShaderProgram::bind(&mut manager_ref, shader_progam);
-    manager_ref.get_mut_shader_program(shader_progam).unwrap().set_uniform_i32("tex", &[0]).expect("tex sampler2d set to 0");
+    // Texture for triangle 1
+    let texture_handle_t1 = manager_ref.insert_texture2d(
+        Texture2d::new(&context, Texture2dParams
+        {
+            target: Context::TEXTURE_2D,
+            format: Context::RGBA,
+            size: (1, 1),
+            wrap_type: Context::REPEAT,
+            filter_type: Context::NEAREST,
+            data: vec![253.0 as u8, 94.0 as u8, 0, 255]
+        }).expect("texture")
+    );
 
-    let tex = Texture2d::new(&context, Texture2dParams
-    {
-        target: Context::TEXTURE_2D,
-        format: Context::RGBA,
-        size: (1, 1),
-        wrap_type: Context::REPEAT,
-        filter_type: Context::NEAREST,
-        //data: vec![255, 0, 0, 255]
-        //data: vec![(253.0f32/255.0f32) as u8, (94.0f32/255.0f32) as u8, 0, 255]
-        data: vec![253.0 as u8, 94.0 as u8, 0, 255]
-    }).expect("texture");
-    context.active_texture(Context::TEXTURE0);
-
-    let tex = manager_ref.insert_texture2d(tex);
-    Texture2d::bind(&mut manager_ref, tex);
-
-    // Triangle point data
-    let triangle =
-        [
-            Vertex { pos: [-0.5, -0.5, 0.0], tex: [0.0, 0.0] },
-            Vertex { pos: [ 0.5, -0.5, 0.0], tex: [1.0, 0.0] },
-            Vertex { pos: [ 0.0,  0.5, 0.0], tex: [0.5, 1.0] }
-        ];
-    // Triangle point order
-    let indices: [u32; 3] = [0, 1, 2];
+    // Texture for triangle 2
+    let texture_handle_t2 = manager_ref.insert_texture2d(
+        Texture2d::new(&context, Texture2dParams
+        {
+            target: Context::TEXTURE_2D,
+            format: Context::RGBA,
+            size: (1, 1),
+            wrap_type: Context::REPEAT,
+            filter_type: Context::NEAREST,
+            data: vec![30.0 as u8, 144.0 as u8, 255.0 as u8, 255]
+        }).expect("texture")
+    );
 
     // VAO setup
-    let mut vao = VertexArray::new(&context).expect("vertex array");
-    vao.bind_internal();
+    let vert_arr_handle = manager_ref.insert_vertex_array(
+        VertexArray::new(&context).expect("vertex array")
+    );
 
-    // Array buffer setup
-    let mut arr_buff = ArrayBuffer::new(&context).expect("array buffer");
-    arr_buff.bind_internal();
+    let arr_buff_handle = manager_ref.insert_array_buffer(
+        ArrayBuffer::new(&context).expect("array buffer")
+    );
 
-    arr_buff.buffer_data(&triangle, Context::STATIC_DRAW);
-    let attribs = vec![
-        AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, pos) as i32),
-        AttribPointer::without_defaults(1, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, tex) as i32),
-    ];
-    let arr_buff = manager_ref.insert_array_buffer(arr_buff);
-    vao.register_array_buffer(arr_buff, Some(attribs));
+    let elem_buff_handle = manager_ref.insert_element_array_buffer(
+        ElementArrayBuffer::new(&context).expect("element array buffer")
+    );
 
-    // Element array buffer setup
-    let mut elem_arr_buff = ElementArrayBuffer::new(&context).expect("element array buffer");
-    elem_arr_buff.bind_internal();
-    elem_arr_buff.buffer_data(&indices, Context::STATIC_DRAW);
-    let elem_arr_buff = manager_ref.insert_element_array_buffer(elem_arr_buff);
-    vao.register_element_array_buffer(elem_arr_buff, None);
+    {
+        VertexArray::bind(&manager_ref, vert_arr_handle);
+        // Setup the vertex array buffer with the triangle vertices
+        ArrayBuffer::bind(&manager_ref, arr_buff_handle);
+        {
+            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("array buffer");
+            arr_buff.buffer_data(&TRIANGLE_VERTICESS, Context::STATIC_DRAW);
+        }
+        // Setup the element array buffer with the triangle indices
+        ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
+        {
+            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("element array buffer");
+            elem_arr_buff.buffer_data(&TRIANGLE_INDICES, Context::STATIC_DRAW);
+        }
+        // Register the vertex and element array buffers with the VAO
+        {
+            let mut vert_arr = manager_ref.get_mut_vertex_array(vert_arr_handle).expect("vertex array");
 
-    vao.unbind_internal();
-    manager_ref.get_array_buffer(arr_buff).unwrap().unbind_internal();
-    manager_ref.get_element_array_buffer(elem_arr_buff).unwrap().unbind_internal();
-    let vao = manager_ref.insert_vertex_array(vao);
-
-    let mut transformation = Transformation::new();
-
-    let mut uniform_buffer = UniformBuffer::new(
-        &context,
-        std::mem::size_of::<Matrix4<f32>>() as i32,
-        // Needs to be Vector4 even though its actually a Vector3
-        // Using 3 element vectors with google chrome causes issues
-        0,
-        Context::STATIC_DRAW
-    ).expect("uniform buffer handle");
-    uniform_buffer.bind_internal();
-    uniform_buffer.add_vert_block(&mut manager_ref.get_mut_shader_program(shader_progam).unwrap(), "VertData").expect("VertData bound");
-
-    uniform_buffer.unbind_internal();
-    let uniform_buffer = manager_ref.insert_uniform_buffer(uniform_buffer);
+            let attribs = vec![
+                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, pos) as i32),
+                AttribPointer::without_defaults(1, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, tex) as i32),
+            ];
+            vert_arr.register_array_buffer(arr_buff_handle, Some(attribs));
+            vert_arr.register_element_array_buffer(elem_buff_handle, None);
+        }
+        VertexArray::unbind(&manager_ref, vert_arr_handle);
+        ArrayBuffer::unbind(&manager_ref, arr_buff_handle);
+        ElementArrayBuffer::unbind(&manager_ref, elem_buff_handle);
+    }
 
     // Release the borrow on the manager
     drop(manager_ref);
 
+    // Log any errors that may have occurred during setup
     crate::log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
+    // Wrap the context in an Rc<RefCell<>>
     wrap!(context);
 
+    // Direction of triangle movement
+    let mut dir: f32 = 1.0;
+    // Speed factor of triangle movement
+    let speed: f32 = 0.5;
+    // Get javascript performance ref for getting frame time
+    let performance = window.performance().expect("performance");
+    let mut last_time: Duration = Duration::new(0, 0);
+
+    let delta_time: f32 = 0.01;
+    let mut accumulator: f32 = 0.0;
+
+    let renderer = Renderer2D::new(&context.borrow(), &mut manager.borrow_mut()).expect("2d renderer");
+
+    // Setup render information for triangle
+    let mut transformation_t1 = Transformation::new();
+    let mut transformation_t2 = Transformation::new();
+    let t1 = RenderDto
+    {
+        tex_handle: texture_handle_t1,
+        vert_arr_handle: vert_arr_handle,
+        num_indices: 3
+    };
+    let t2 = RenderDto
+    {
+        tex_handle: texture_handle_t2,
+        vert_arr_handle: vert_arr_handle,
+        num_indices: 3
+    };
+
     let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
+
     let render_func =
         {
             clone!(context, manager);
-            let mut dir: f32 = 1.0;
-            let speed: f32 = 0.5;
-            let performance = window.performance().expect("performance");
-            let mut last_time: Duration = Duration::new(0, 0);
-
-            let dt: f32 = 0.01;
-            let mut accumulator: f32 = 0.0;
-            let mut update = false;
 
             move ||
                 {
+                    // If this is the first frame, initialize last_time to now
                     if last_time.as_secs() == 0
                     {
                         last_time = time(&performance);
                     }
+                    // Calculate the time elapsed between last frame and now
                     let now_time = time(&performance);
                     let elapsed_time = now_time - last_time;
                     last_time = now_time;
@@ -210,14 +247,18 @@ pub fn main() -> Result<(), JsValue>
 
                     accumulator += elapsed_time;
 
-                    while accumulator >= dt
+                    // Perform any updates skipped due to missed frames
+                    while accumulator >= delta_time
                     {
-                        transformation.global.translate(&vec3(speed * dir * dt, 0.0, 0.0));
-                        transformation.local.rotate_angle_axis(Deg(10.0 * dt), &vec3(0.0, 0.0, 1.0));
+                        transformation_t1.global.translate(&vec3(speed * dir * delta_time, 0.0, 0.0));
+                        transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
 
+                        transformation_t2.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
+
+                        // Triangle movement bounds
                         let translation =
                             {
-                                let mut t = transformation.global.get_translation().clone();
+                                let mut t = transformation_t1.global.get_translation().clone();
                                 if dir == -1.0
                                 {
                                     t.x = f32::max(-0.5, t.x);
@@ -229,37 +270,42 @@ pub fn main() -> Result<(), JsValue>
                                 t
                             };
 
-                        transformation.global.set_translation(translation);
-                        if transformation.translation().x <= -0.5 || transformation.translation().x >= 0.5
+                        transformation_t1.global.set_translation(translation);
+                        // Reverse triangle direction if out of the bounds
+                        if transformation_t1.translation().x <= -0.5 || transformation_t1.translation().x >= 0.5
                         {
                             dir *= -1.0;
                         }
 
-                        accumulator -= dt;
-                        update = true;
-                    }
-
-                    {
-                        borrow!(manager);
-                        if update
-                        {
-                            let buff: &[f32; 16] = transformation.matrix().as_ref();
-                            UniformBuffer::bind(&manager, uniform_buffer);
-                            {
-                                let mut uniform_buffer = manager.get_mut_uniform_buffer(uniform_buffer).expect("uniform buffer");
-                                uniform_buffer.buffer_vert_data(buff);
-                            }
-                        }
-                        VertexArray::bind(&manager, vao);
+                        accumulator -= delta_time;
                     }
 
                     {
                         borrow!(context);
+                        // Reset the render area
                         context.clear_color(0.0, 0.0, 0.0, 1.0);
                         context.clear(Context::COLOR_BUFFER_BIT);
-                        context.draw_elements_with_i32(Context::TRIANGLES, 3, Context::UNSIGNED_INT, 0);
+
+                        // Setup scene graph
+                        let nodes =
+                            vec![
+                                Node(
+                                    &t1,
+                                    transformation_t1.matrix(),
+                                    Some(vec![
+                                            Node(
+                                                &t2,
+                                                transformation_t2.matrix(),
+                                                None
+                                            ),
+                                        ])
+                                ),
+                            ];
+
+                        renderer.render(&context, &manager.borrow(), &nodes);
                     }
 
+                    // Input state tests
                     let state = input_listener.key_state(Key_a);
                     if state == InputState::Down
                     {
@@ -272,10 +318,11 @@ pub fn main() -> Result<(), JsValue>
                 }
         };
 
-
+    // Setup and start render loop
     let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func).expect("render_loop")));
     render_loop.borrow_mut().start().unwrap();
 
+    // Tests for event listener and starting/stopping render loop
     {
         clone!(context, render_loop);
         let callback = move |event: web_sys::KeyboardEvent|
