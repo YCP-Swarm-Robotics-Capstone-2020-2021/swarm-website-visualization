@@ -148,6 +148,12 @@ impl SubTransformation
         &self.translation
     }
 
+    #[allow(dead_code)]
+    pub fn has_changed(&self) -> bool
+    {
+        self.has_changed
+    }
+
     /// Assembles the transformation components into a matrix
     /// Mutable since it uses/updates an internal cache
     #[allow(dead_code)]
@@ -238,6 +244,12 @@ impl Transformation
     pub fn size(&self) -> Vector3<f32>
     {
         self.base_size.mul_element_wise(self.scale())
+    }
+
+    #[allow(dead_code)]
+    pub fn has_changed(&self) -> bool
+    {
+        self.global.has_changed || self.local.has_changed
     }
 
     #[allow(dead_code)]
