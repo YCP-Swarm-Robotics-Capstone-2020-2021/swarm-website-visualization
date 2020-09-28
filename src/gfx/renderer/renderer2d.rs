@@ -62,7 +62,7 @@ impl Renderer2D
         let mut shader_program = manager.get_mut_shader_program(renderer.shader_program_handle).expect("renderer2d shader program");
         let mut uniform_buffer = manager.get_mut_uniform_buffer(renderer.uniform_buff_handle).expect("renderer2d uniform buffer");
         // Set the shader sampler2d to TEXTURE0
-        shader_program.set_uniform_i32("texture", &[0])?;
+        shader_program.set_uniform_i32("tex", &[0])?;
         uniform_buffer.add_vert_block(&mut shader_program, "VertData")?;
 
         Ok(renderer)
