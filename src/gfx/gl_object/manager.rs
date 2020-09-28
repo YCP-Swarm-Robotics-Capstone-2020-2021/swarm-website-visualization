@@ -3,6 +3,7 @@ use std::
 {
     cell::
     {
+        Cell,
         RefCell,
         Ref,
         RefMut,
@@ -32,7 +33,7 @@ macro_rules! define_manager
         {
             $(
             [<$managed_struct:snake s>]: ClosedGenVec<RefCell<$module_path::$managed_struct>>,
-            [<bound_ $managed_struct:snake>]: Option<[<$handle_name:camel>]>
+            [<bound_ $managed_struct:snake>]: Cell<Option<[<$handle_name:camel>]>>
             ),+
         }
 
@@ -44,7 +45,7 @@ macro_rules! define_manager
                 {
                     $(
                     [<$managed_struct:snake s>]: ClosedGenVec::new(),
-                    [<bound_ $managed_struct:snake>]: None
+                    [<bound_ $managed_struct:snake>]: Cell::new(None)
                     ),+
                 }
             }
@@ -78,18 +79,19 @@ macro_rules! define_manager
             /// Bind the struct associated with `handle`
             /// `bound` is whether `handle` should be bound or unbound after this function call
             #[allow(dead_code)]
-            pub fn [<bind_ $managed_struct:snake>](&mut self, handle: [<$handle_name:camel>], bound: bool) -> Result<(), GfxError>
+            pub fn [<bind_ $managed_struct:snake>](&self, handle: [<$handle_name:camel>], bound: bool) -> Result<(), GfxError>
             {
                 if let Some(obj) = self.[<$managed_struct:snake s>].get(handle)
                 {
-                    if bound && self.[<bound_ $managed_struct:snake>] != Some(handle)
+                    let bound_struct = self.[<bound_ $managed_struct:snake>].get();
+                    if bound && bound_struct != Some(handle)
                     {
-                        self.[<bound_ $managed_struct:snake>] = Some(handle);
+                        self.[<bound_ $managed_struct:snake>].set(Some(handle));
                         obj.borrow().bind_internal();
                     }
-                    else if !bound && self.[<bound_ $managed_struct:snake>] != None
+                    else if !bound && bound_struct != None
                     {
-                        self.[<bound_ $managed_struct:snake>] = None;
+                        self.[<bound_ $managed_struct:snake>].set(None);
                         obj.borrow().unbind_internal();
                     }
                 }
@@ -110,7 +112,7 @@ macro_rules! define_manager
                 )+
 
                 $(
-                if let Some(handle) = self.[<bound_ $managed_struct:snake>]
+                if let Some(handle) = self.[<bound_ $managed_struct:snake>].get()
                 {
                     if let Some(obj) = self.[<$managed_struct:snake s>].get(handle)
                     {
