@@ -1,6 +1,7 @@
 use std::
 {
-    cell::{Ref},
+    rc::Rc,
+    cell::{RefCell, RefMut},
 };
 
 use cgmath::Matrix4;
@@ -18,34 +19,35 @@ use crate::gfx::
         texture::Texture2d
     },
 };
-use wasm_bindgen::__rt::RefMut;
 
 pub struct RenderDto
 {
     pub model_mat: [f32; 16],
     pub tex_handle: GlObjectHandle,
     pub vert_arr_handle: GlObjectHandle,
-    pub num_indices: u32,
+    pub num_indices: i32,
 }
 pub struct Node<'a>(RenderDto, &'a [Node<'a>]);
 
 pub struct Renderer2D
 {
+    context: Rc<RefCell<Context>>,
     shader_program_handle: GlObjectHandle,
     uniform_buff_handle: GlObjectHandle,
 }
 
 impl Renderer2D
 {
-    pub fn new(context: &Context, manager: &mut GlObjectManager) -> Result<Renderer2D, GfxError>
+    pub fn new(context: &Rc<RefCell<Context>>, manager: &mut GlObjectManager) -> Result<Renderer2D, GfxError>
     {
         let renderer = Renderer2D
         {
+            context: context.clone(),
             shader_program_handle: manager.insert_shader_program(
-                ShaderProgram::new(&context, Some(shader_source::TEXTURE_VERT.to_string()), Some(shader_source::TEXTURE_FRAG.to_string()))?,
+                ShaderProgram::new(&context.borrow(), Some(shader_source::TEXTURE_VERT.to_string()), Some(shader_source::TEXTURE_FRAG.to_string()))?,
             ),
             uniform_buff_handle: manager.insert_uniform_buffer(
-                UniformBuffer::new(context, std::mem::size_of::<Matrix4<f32>>() as i32, 0, Context::DYNAMIC_DRAW)?
+                UniformBuffer::new(&context.borrow(), std::mem::size_of::<Matrix4<f32>>() as i32, 0, Context::DYNAMIC_DRAW)?
             ),
         };
         ShaderProgram::bind(manager, renderer.shader_program_handle);
@@ -58,17 +60,24 @@ impl Renderer2D
         Ok(renderer)
     }
 
-    pub fn render<'a>(&self, manager: &mut GlObjectManager, nodes: &[Node<'a>])
+    pub fn render<'a>(&self, manager: &GlObjectManager, nodes: &[Node<'a>])
     {
         ShaderProgram::bind(manager, self.shader_program_handle);
         UniformBuffer::bind(manager, self.uniform_buff_handle);
 
-        let mut uniform_buffer: UniformBuffer = manager.get_mut_uniform_buffer(self.uniform_buff_handle).expect("renderer2d uniform buffer");
+        let mut uniform_buffer: RefMut<UniformBuffer> = manager.get_mut_uniform_buffer(self.uniform_buff_handle).expect("renderer2d uniform buffer");
+        borrow!(self.context);
 
         for node in nodes
         {
             uniform_buffer.buffer_vert_data(&node.0.model_mat);
 
+            context.active_texture(Context::TEXTURE0);
+            Texture2d::bind(manager, node.0.tex_handle);
+
+            VertexArray::bind(manager, node.0.vert_arr_handle);
+
+            context.draw_elements_with_i32(Context::TRIANGLES, node.0.num_indices, Context::UNSIGNED_INT, 0);
         }
     }
 }
