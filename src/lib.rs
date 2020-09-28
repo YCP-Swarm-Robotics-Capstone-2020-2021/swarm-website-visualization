@@ -240,17 +240,17 @@ pub fn main() -> Result<(), JsValue>
                     }
 
                     {
-                        borrow_mut!(manager);
+                        borrow!(manager);
                         if update
                         {
                             let buff: &[f32; 16] = transformation.matrix().as_ref();
-                            UniformBuffer::bind(&mut manager, uniform_buffer);
+                            UniformBuffer::bind(&manager, uniform_buffer);
                             {
                                 let mut uniform_buffer = manager.get_mut_uniform_buffer(uniform_buffer).expect("uniform buffer");
                                 uniform_buffer.buffer_vert_data(buff);
                             }
                         }
-                        VertexArray::bind(&mut manager, vao);
+                        VertexArray::bind(&manager, vao);
                     }
 
                     {
