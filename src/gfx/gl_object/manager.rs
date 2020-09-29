@@ -33,8 +33,9 @@ macro_rules! define_manager
         {
             $(
             [<$managed_struct:snake s>]: ClosedGenVec<RefCell<$module_path::$managed_struct>>,
-            [<bound_ $managed_struct:snake>]: Cell<Option<[<$handle_name:camel>]>>
-            ),+
+            [<bound_ $managed_struct:snake>]: Cell<Option<[<$handle_name:camel>]>>,
+            )+
+            active_texture: Cell<u32>,
         }
 
         impl $manager_name
@@ -45,8 +46,9 @@ macro_rules! define_manager
                 {
                     $(
                     [<$managed_struct:snake s>]: ClosedGenVec::new(),
-                    [<bound_ $managed_struct:snake>]: Cell::new(None)
-                    ),+
+                    [<bound_ $managed_struct:snake>]: Cell::new(None),
+                    )+
+                    active_texture: Cell::new(u32::MAX)
                 }
             }
 
@@ -103,6 +105,15 @@ macro_rules! define_manager
                 Ok(())
             }
             )+
+            /// Set the active texture unit, i.e. TEXTURE0
+            pub fn set_active_texture(&self, context: &Context, texture: u32)
+            {
+                if self.active_texture.get() != texture
+                {
+                    context.active_texture(texture);
+                    self.active_texture.set(texture);
+                }
+            }
             /// Reloads the state of all owned structs and re-binds the previously bound structs
             #[allow(dead_code)]
             pub fn reload_objects(&self, context: &Context)
@@ -120,6 +131,8 @@ macro_rules! define_manager
                     }
                 }
                 )+
+
+                context.active_texture(self.active_texture.get());
             }
         }
     }};

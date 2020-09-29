@@ -78,7 +78,8 @@ impl Renderer2D
         UniformBuffer::bind(manager, self.uniform_buff_handle);
 
         let mut uniform_buffer: RefMut<UniformBuffer> = manager.get_mut_uniform_buffer(self.uniform_buff_handle).expect("renderer2d uniform buffer");
-        context.active_texture(Context::TEXTURE0);
+        // context.active_texture(Context::TEXTURE0);
+        manager.set_active_texture(&context, Context::TEXTURE0);
 
         // Iterate over scene graph
         for parent in nodes
