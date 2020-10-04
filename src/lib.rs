@@ -57,6 +57,7 @@ use crate::
             texture::{Texture2d, Texture2dParams},
             manager::{GlObjectManager},
         },
+        camera::Camera,
     },
     input::
     {
@@ -88,9 +89,9 @@ fn log_s(s: String)
 
 const TRIANGLE_VERTICESS: [Vertex; 3] =
     [
-        Vertex { pos: [-0.5, -0.5, 0.0], tex: [0.0, 0.0] },
-        Vertex { pos: [ 0.5, -0.5, 0.0], tex: [1.0, 0.0] },
-        Vertex { pos: [ 0.0,  0.5, 0.0], tex: [0.5, 1.0] }
+        Vertex { pos: [-0.5, -0.5, 1.0], tex: [0.0, 0.0] },
+        Vertex { pos: [ 0.5, -0.5, 1.0], tex: [1.0, 0.0] },
+        Vertex { pos: [ 0.0,  0.5, 1.0], tex: [0.5, 1.0] }
     ];
 const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
 
@@ -99,7 +100,7 @@ pub fn main() -> Result<(), JsValue>
 {
     // Allow panics to print to javascript console if debug build
     #[cfg(feature="debug")]
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     // Get HTML element references
     let window: Window = window().expect("window context");
@@ -222,11 +223,58 @@ pub fn main() -> Result<(), JsValue>
         num_indices: 3
     };
 
+    let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 10.0f32);
+    let mut camera = Rc::new(RefCell::new(
+        Camera::from_eye(
+            vec3(0.0, 0.0, 0.0),
+            vec3(0.0, 0.0, 1.0),
+            vec3(0.0, 1.0, 0.0)
+        )));
+    {
+        clone!(camera);
+        let callback = move |event: web_sys::WheelEvent|
+            {
+                if event.delta_y() > 0.0
+                {
+                    camera.borrow_mut().move_cam_long(0.1);
+                }
+                else if event.delta_y() < 0.0
+                {
+                    camera.borrow_mut().move_cam_long(-0.1);
+                }
+            };
+        let ev = EventListener::new(&canvas, "wheel", callback).expect("zoom event listener");
+        ev.forget();
+    }
+
+    {
+        clone!(camera);
+        let callback = move |event: web_sys::MouseEvent|
+            {
+                if event.buttons() == 1
+                {
+                    borrow_mut!(camera);
+                    if event.movement_x() != 0
+                    {
+                        //camera.move_cam_lat(event.movement_x() as f32 / 800.0);
+                        let delta = if event.movement_x() < 0 { -1.0 } else { 1.0 };
+                        camera.rotate_cam_yaw(delta);
+                    }
+                    if event.movement_y() != 0
+                    {
+                        //camera.move_cam_vert(event.movement_y() as f32 / 800.0);
+                    }
+                }
+            };
+        let ev = EventListener::new(&canvas, "mousemove", callback).expect("mouse move event listener");
+        ev.forget();
+    }
+
     let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
 
     let render_func =
         {
-            clone!(context, manager);
+            clone!(context, manager, camera);
 
             move ||
                 {
@@ -250,32 +298,32 @@ pub fn main() -> Result<(), JsValue>
                     // Perform any updates skipped due to missed frames
                     while accumulator >= delta_time
                     {
-                        transformation_t1.global.translate(&vec3(speed * dir * delta_time, 0.0, 0.0));
+                        //transformation_t1.global.translate(&vec3(speed * dir * delta_time, 0.0, 0.0));
                         transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
 
                         transformation_t2.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
 
                         // Triangle movement bounds
-                        let translation =
-                            {
-                                let mut t = transformation_t1.global.get_translation().clone();
-                                if dir == -1.0
-                                {
-                                    t.x = f32::max(-0.5, t.x);
-                                }
-                                else if dir == 1.0
-                                {
-                                    t.x = f32::min(0.5, t.x);
-                                }
-                                t
-                            };
+                        /*                        let translation =
+                                                    {
+                                                        let mut t = transformation_t1.global.get_translation().clone();
+                                                        if dir == -1.0
+                                                        {
+                                                            t.x = f32::max(-0.5, t.x);
+                                                        }
+                                                        else if dir == 1.0
+                                                        {
+                                                            t.x = f32::min(0.5, t.x);
+                                                        }
+                                                        t
+                                                    };
 
-                        transformation_t1.global.set_translation(translation);
-                        // Reverse triangle direction if out of the bounds
-                        if transformation_t1.translation().x <= -0.5 || transformation_t1.translation().x >= 0.5
-                        {
-                            dir *= -1.0;
-                        }
+                                                transformation_t1.global.set_translation(translation);
+                                                // Reverse triangle direction if out of the bounds
+                                                if transformation_t1.translation().x <= -0.5 || transformation_t1.translation().x >= 0.5
+                                                {
+                                                    dir *= -1.0;
+                                                }*/
 
                         accumulator -= delta_time;
                     }
@@ -293,28 +341,38 @@ pub fn main() -> Result<(), JsValue>
                                     &t1,
                                     transformation_t1.matrix(),
                                     Some(vec![
-                                            Node(
-                                                &t2,
-                                                transformation_t2.matrix(),
-                                                None
-                                            ),
-                                        ])
+                                        Node(
+                                            &t2,
+                                            transformation_t2.matrix(),
+                                            None
+                                        ),
+                                    ])
                                 ),
                             ];
 
-                        renderer.render(&context, &manager.borrow(), &nodes);
+                        renderer.render(&context, &manager.borrow(), perspective * camera.borrow().view_matrix(), &nodes);
                     }
 
                     // Input state tests
-                    let state = input_listener.key_state(Key_a);
-                    if state == InputState::Down
+                    borrow_mut!(camera);
+                    if input_listener.key_state(Key_ArrowLeft) == InputState::Down
                     {
-                        crate::log("Key 'a' is down");
+                        camera.move_cam_lat(0.1);
+                        crate::log("aa");
                     }
-                    else if state == InputState::Repeating
+                    if input_listener.key_state(Key_ArrowRight) == InputState::Down
                     {
-                        crate::log("Key 'a' is repeating");
+                        camera.move_cam_lat(-0.1);
                     }
+                    if input_listener.key_state(Key_ArrowUp) == InputState::Down
+                    {
+                        camera.move_cam_vert(0.1);
+                    }
+                    if input_listener.key_state(Key_ArrowDown) == InputState::Down
+                    {
+                        camera.move_cam_vert(-0.1);
+                    }
+
                 }
         };
 
@@ -322,28 +380,26 @@ pub fn main() -> Result<(), JsValue>
     let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func).expect("render_loop")));
     render_loop.borrow_mut().start().unwrap();
 
-    // Tests for event listener and starting/stopping render loop
     {
-        clone!(context, render_loop);
         let callback = move |event: web_sys::KeyboardEvent|
             {
-                if event.key() == Key_1
+                if event.key() == Key_ArrowUp || event.key() == Key_ArrowDown
+                    || event.key() == Key_ArrowLeft || event.key() == Key_ArrowRight
                 {
-                    render_loop.borrow_mut().start().expect("render loop started");
+                    event.prevent_default();
                 }
-                else if event.key() == Key_2
+                if false
                 {
-                    render_loop.borrow_mut().pause().expect("render loop paused");
-                    borrow!(context);
-                    context.clear_color(0.0, 0.0, 0.0, 1.0);
-                    context.clear(Context::COLOR_BUFFER_BIT);
-                }
-                else if event.key() == Key_3
-                {
-                    render_loop.borrow_mut().cleanup();
+                    render_loop.borrow();
                 }
             };
         let ev = EventListener::new(&canvas, "keydown", callback).expect("event listener registered");
+        ev.forget();
+        let callback = move |event: web_sys::WheelEvent|
+            {
+                event.prevent_default();
+            };
+        let ev = EventListener::new(&canvas, "wheel", callback).expect("event listener registered");
         ev.forget();
     }
 

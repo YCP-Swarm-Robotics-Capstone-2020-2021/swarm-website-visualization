@@ -42,6 +42,7 @@ features = [
     'Event',
     'KeyboardEvent',
     'MouseEvent',
+    'WheelEvent',
     'Performance',
 
     # WebGL stuff

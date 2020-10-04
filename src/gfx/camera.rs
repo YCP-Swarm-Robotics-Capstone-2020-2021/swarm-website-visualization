@@ -2,6 +2,9 @@ use cgmath::
 {
     Vector3,
     vec3,
+    Vector4,
+    vec4,
+    Point3,
     Matrix3,
     Matrix4,
     Quaternion,
@@ -57,8 +60,6 @@ impl Camera
     ///     This is good for stuff like a character walking around, as the
     ///     camera can look up/down while staying at the same height
 
-    // TODO: These constructor function names are just place holders so that I can write the functions,
-    //  they're horrible for actual function names
     // TODO: Cache results from functions that return computed values
 
     /// Creates a new camera from the given eye coordinates
@@ -71,7 +72,6 @@ impl Camera
     pub fn from_eye(eye_pos: Vector3<f32>, looking_at: Vector3<f32>, world_up: Vector3<f32>) -> Camera
     {
         let world_forward = looking_at.sub_element_wise(eye_pos);
-        println!("{:?}", world_forward);
         Camera::from_eye_and_world(
             eye_pos,
             looking_at,
@@ -103,7 +103,7 @@ impl Camera
             translation: vec3(0.0, 0.0, 0.0),
             zoom: 0.0,
             zoom_min: 0.0,
-            zoom_max: 0.0
+            zoom_max: f32::MAX
         }
     }
 
@@ -352,10 +352,11 @@ impl Camera
 
     pub fn view_matrix(&self) -> Matrix4<f32>
     {
-        let view = Matrix3::look_at(self.looking_at - self.get_zoomed_eye_pos(), self.world_up)
-            * Into::<Matrix3<f32>>::into(self.orientation);
-        let mut view: Matrix4<f32> = view.into();
-        view[2] = view[0] * self.translation[0] + view[1] * self.translation[1] + view[2];
+        let eye_pos = self.get_zoomed_eye_pos();
+        let mut view = Matrix4::look_at(Point3::new(eye_pos.x, eye_pos.y, eye_pos.z), Point3::new(self.looking_at.x, self.looking_at.y, self.looking_at.z), self.world_up)
+            * Into::<Matrix4<f32>>::into(self.orientation);
+        crate::log_s(format!("{:?}", view));
+        view[3] = self.translation.extend(1.0);
         view
     }
 }
@@ -386,7 +387,7 @@ mod tests
 
             world_up: vec3(0.0, 1.0, 0.0),
             world_forward: vec3(0.0, 0.0, 0.1),
-            world_right: vec3(0.1, 0.0, 0.0),
+            world_right: vec3(-0.1, 0.0, 0.0),
 
             orientation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
             translation: vec3(0.0, 0.0, 0.0),
@@ -411,6 +412,14 @@ mod tests
     #[test]
     fn test_from_eye_and_world()
     {
+        let cam = Camera::from_eye_and_world(
+            TEST_CAM.eye_pos,
+            TEST_CAM.looking_at,
+            TEST_CAM.world_up,
+            TEST_CAM.world_forward,
+            TEST_CAM.world_right
+        );
 
+        assert_eq!(TEST_CAM, cam);
     }
 }

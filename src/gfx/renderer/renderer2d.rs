@@ -71,8 +71,9 @@ impl Renderer2D
     /// Render's a scene
     /// `context` is the current rendering context
     /// `manager` is the object manager for the `RenderDto`s in `nodes`
+    /// `proj_view_mat` is the projection-view matrix
     /// `nodes` is the scene graph to render
-    pub fn render<'a>(&self, context: &Context, manager: &GlObjectManager, nodes: &Vec<Node<'a>>)
+    pub fn render<'a>(&self, context: &Context, manager: &GlObjectManager, proj_view_mat: Matrix4<f32>, nodes: &Vec<Node<'a>>)
     {
         ShaderProgram::bind(manager, self.shader_program_handle);
         UniformBuffer::bind(manager, self.uniform_buff_handle);
@@ -92,8 +93,8 @@ impl Renderer2D
                     // Multiply the parent matrix into the child's model
                     // matrix and buffer it
                     {
-                        let model_mat = parent.1 * child.1;
-                        let buff: &[f32; 16] = model_mat.as_ref();
+                        let mvp = proj_view_mat * parent.1 * child.1;
+                        let buff: &[f32; 16] = mvp.as_ref();
                         uniform_buffer.buffer_vert_data(buff);
                     }
                     // Bind the appropriate resources and draw the object
@@ -105,7 +106,8 @@ impl Renderer2D
 
             // Buffer the model matrix
             {
-                let buff: &[f32; 16] = parent.1.as_ref();
+                let mvp = proj_view_mat * parent.1;
+                let buff: &[f32; 16] = mvp.as_ref();
                 uniform_buffer.buffer_vert_data(buff);
             }
             // Bind the appropriate resources and draw the object
