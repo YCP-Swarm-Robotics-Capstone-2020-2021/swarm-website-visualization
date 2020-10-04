@@ -12,6 +12,7 @@ use cgmath::
     InnerSpace,
 };
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Camera
 {
     eye_pos: Vector3<f32>,
@@ -31,14 +32,47 @@ pub struct Camera
 
 impl Camera
 {
+    /// Important notes about the naming conventions for functions:
+    ///
+    /// Anything regarding the "world" doesn't perform operations from the
+    /// camera's view. Manipulating the world is essentially an
+    /// inverse camera manipulation. So moving the world "left" makes the
+    /// camera seem as if its moving "right"
+    ///
+    /// Anything regarding the "camera", performs operations from the
+    /// camera's view
+    ///
+    /// *_lat() is lateral movement, i.e. left and right
+    /// *_vert() is vertical movement, i.e. up and down
+    /// *_long() is longitudinal movement, i.e. forward and back
+    /// yaw rotation is rotating around the camera's vertical axis
+    ///     i.e. "looking" left/right
+    /// pitch rotation is rotating around the camera's lateral/horizontal axis
+    ///     i.e. "looking" up/down
+    /// roll rotation is rotating around the camera's longitudinal axis
+    ///     i.e. tilting your head left/right
+    ///
+    /// *_locked() operations do not effect the y component.
+    ///     i.e. "locking" the camera to its current "height".
+    ///     This is good for stuff like a character walking around, as the
+    ///     camera can look up/down while staying at the same height
+
     // TODO: These constructor function names are just place holders so that I can write the functions,
     //  they're horrible for actual function names
     // TODO: Cache results from functions that return computed values
 
-    pub fn from_three(eye_pos: Vector3<f32>, looking_at: Vector3<f32>, world_up: Vector3<f32>) -> Camera
+    /// Creates a new camera from the given eye coordinates
+    /// This uses the given parameters to calculate the other necessary
+    /// world coordinates
+    ///
+    /// `eye_pos` is the position of the camera's eye
+    /// `looking_at` is the direction that the eye is looking
+    /// `world_up` is "up" direction of the world from the camera's view
+    pub fn from_eye(eye_pos: Vector3<f32>, looking_at: Vector3<f32>, world_up: Vector3<f32>) -> Camera
     {
         let world_forward = looking_at.sub_element_wise(eye_pos);
-        Camera::from_all(
+        println!("{:?}", world_forward);
+        Camera::from_eye_and_world(
             eye_pos,
             looking_at,
             world_up,
@@ -47,7 +81,16 @@ impl Camera
         )
     }
 
-    pub fn from_all(eye_pos: Vector3<f32>, looking_at: Vector3<f32>, world_up: Vector3<f32>, world_forward: Vector3<f32>, world_right: Vector3<f32>) -> Camera
+    /// Creates a new camera from the given eye and world coordinates
+    ///
+    /// `eye_pos` is the position of the camera's eye
+    /// `looking_at` is the direction that the eye is looking
+    /// `world_up` is the "up" direction of the world from the camera's view
+    /// `world_forward` is the "forward" direction of the world from the
+    ///     camera's view
+    /// `world_right` is the "right" direction of the world from the
+    ///     camera's view
+    pub fn from_eye_and_world(eye_pos: Vector3<f32>, looking_at: Vector3<f32>, world_up: Vector3<f32>, world_forward: Vector3<f32>, world_right: Vector3<f32>) -> Camera
     {
         Camera
         {
@@ -195,19 +238,32 @@ impl Camera
 
     pub fn zoom(&mut self, delta: f32)
     {
-        self.eye_pos += delta * self.world_forward;
-    }
-
-    pub fn reset_zoom(&mut self)
-    {
-        self.eye_pos -= self.zoom * self.world_forward;
+        self.zoom += delta;
+        if self.zoom > self.zoom_max
+        {
+            self.zoom = self.zoom_max;
+        }
+        else if self.zoom < self.zoom_min
+        {
+            self.zoom = self.zoom_min;
+        }
     }
 
     pub fn set_zoom(&mut self, zoom: f32)
     {
-        self.reset_zoom();
-        self.eye_pos += zoom * self.world_forward;
-        self.zoom = zoom;
+        self.zoom =
+            if zoom > self.zoom_max
+            {
+                self.zoom_max
+            }
+            else if zoom < self.zoom_min
+            {
+                self.zoom_min
+            }
+            else
+            {
+                zoom
+            };
     }
 
     pub fn set_min_zoom(&mut self, zoom_min: f32)
@@ -230,16 +286,12 @@ impl Camera
 
     /// Getters
 
-    pub fn get_base_eye_pos(&self) -> Vector3<f32>
+    /// Get the camera's base eye position
+    pub fn get_eye_pos(&self) -> Vector3<f32>
     {
         self.eye_pos
     }
-
-    pub fn get_world_eye_pos(&self) -> Vector3<f32>
-    {
-        (self.orientation * (self.eye_pos - (self.zoom * self.world_forward * 2.0))) + self.translation
-    }
-
+    
     pub fn get_looking_at(&self) -> Vector3<f32>
     {
         self.looking_at
@@ -265,8 +317,20 @@ impl Camera
         self.translation
     }
 
+    pub fn get_zoomed_eye_pos(&self) -> Vector3<f32>
+    {
+        self.eye_pos + (self.zoom * self.world_forward)
+    }
 
-    pub fn get_eye_pos(&self) -> Vector3<f32>
+    /// Get the position of the camera's eye within the world
+    pub fn get_world_eye_pos(&self) -> Vector3<f32>
+    {
+        (self.orientation * (self.get_zoomed_eye_pos() - (self.zoom * self.world_forward * 2.0))) + self.translation
+    }
+
+    /// Get the position of the camera within the world adjusted to be from
+    /// the camera's view
+    pub fn get_world_pos_adjusted(&self) -> Vector3<f32>
     {
         -1.0 * self.get_world_eye_pos()
     }
@@ -288,9 +352,65 @@ impl Camera
 
     pub fn view_matrix(&self) -> Matrix4<f32>
     {
-        let view = Matrix3::look_at(self.looking_at - self.eye_pos, self.world_up) * Into::<Matrix3<f32>>::into(self.orientation);
+        let view = Matrix3::look_at(self.looking_at - self.get_zoomed_eye_pos(), self.world_up)
+            * Into::<Matrix3<f32>>::into(self.orientation);
         let mut view: Matrix4<f32> = view.into();
         view[2] = view[0] * self.translation[0] + view[1] * self.translation[1] + view[2];
         view
+    }
+}
+
+#[cfg(test)]
+mod tests
+{
+    use crate::gfx::camera::Camera;
+    use cgmath::
+    {
+        Vector3,
+        vec3,
+        Matrix3,
+        Matrix4,
+        Quaternion,
+        Rad,
+        Deg,
+        Rotation3,
+        ElementWise,
+        InnerSpace,
+    };
+
+    const TEST_CAM: Camera =
+        Camera
+        {
+            eye_pos: vec3(0.0, 0.0, 0.0),
+            looking_at: vec3(0.0, 0.0, 0.1),
+
+            world_up: vec3(0.0, 1.0, 0.0),
+            world_forward: vec3(0.0, 0.0, 0.1),
+            world_right: vec3(0.1, 0.0, 0.0),
+
+            orientation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
+            translation: vec3(0.0, 0.0, 0.0),
+
+            zoom: 0.0,
+            zoom_min: 0.0,
+            zoom_max: 0.0
+        };
+
+    #[test]
+    fn test_from_eye()
+    {
+        let cam = Camera::from_eye(
+            TEST_CAM.eye_pos,
+            TEST_CAM.looking_at,
+            TEST_CAM.world_up
+        );
+
+        assert_eq!(TEST_CAM, cam);
+
+    }
+    #[test]
+    fn test_from_eye_and_world()
+    {
+
     }
 }
