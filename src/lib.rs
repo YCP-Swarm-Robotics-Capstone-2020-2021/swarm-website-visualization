@@ -95,6 +95,54 @@ const TRIANGLE_VERTICESS: [Vertex; 3] =
     ];
 const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
 
+const CUBE_VERTICES: [Vertex; 24] =
+    [
+        // Back face
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [0.0, 1.0] }, /* Top Left    */
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [1.0, 1.0] }, /* Top Right   */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [0.0, 0.0] }, /* Bottom Left */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [1.0, 0.0] }, /* Bottom Right*/
+
+        // Front face
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [1.0, 2.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [2.0, 2.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [1.0, 1.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [2.0, 1.0] }, /* Bottom Right*/
+
+        // Left face
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [2.0, 3.0] }, /* Top Left    */
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [3.0, 3.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [2.0, 2.0] }, /* Bottom Left */
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [3.0, 2.0] }, /* Bottom Right*/
+
+        // Right face
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [3.0, 4.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [4.0, 4.0] }, /* Top Right   */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [3.0, 3.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [4.0, 3.0] }, /* Bottom Right*/
+
+        // Top face
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [4.0, 5.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [5.0, 5.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [4.0, 4.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [5.0, 4.0] }, /* Bottom Right*/
+
+        // Bottom face
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [5.0, 6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [6.0, 6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [5.0, 5.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [6.0, 5.0] }, /* Bottom Right*/
+    ];
+const CUBE_INDICES: [u32; 36] =
+    [
+         1,  0,  2,  2,  3,  1,
+         5,  4,  6,  6,  7,  5,
+         9,  8, 10, 10, 11,  9,
+        13, 12, 14, 14, 15, 13,
+        17, 16, 18, 18, 19, 17,
+        21, 20, 22, 22, 23, 21
+    ];
+
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue>
 {
@@ -122,10 +170,18 @@ pub fn main() -> Result<(), JsValue>
         {
             target: Context::TEXTURE_2D,
             format: Context::RGBA,
-            size: (1, 1),
+            size: (1, 6),
             wrap_type: Context::REPEAT,
             filter_type: Context::NEAREST,
-            data: vec![253.0 as u8, 94.0 as u8, 0, 255]
+            // data: vec![253.0 as u8, 94.0 as u8, 0, 255]
+            data: vec![
+                128,   0,   0, 255,
+                128,   0, 128, 255,
+                  0, 128, 128, 255,
+                  0,   0, 128, 255,
+                 51, 153, 102, 255,
+                128, 128, 128, 255,
+            ]
         }).expect("texture")
     );
 
@@ -161,13 +217,15 @@ pub fn main() -> Result<(), JsValue>
         ArrayBuffer::bind(&manager_ref, arr_buff_handle);
         {
             let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("array buffer");
-            arr_buff.buffer_data(&TRIANGLE_VERTICESS, Context::STATIC_DRAW);
+            // arr_buff.buffer_data(&TRIANGLE_VERTICESS, Context::STATIC_DRAW);
+            arr_buff.buffer_data(&CUBE_VERTICES, Context::STATIC_DRAW);
         }
         // Setup the element array buffer with the triangle indices
         ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
         {
             let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("element array buffer");
-            elem_arr_buff.buffer_data(&TRIANGLE_INDICES, Context::STATIC_DRAW);
+            //elem_arr_buff.buffer_data(&TRIANGLE_INDICES, Context::STATIC_DRAW);
+            elem_arr_buff.buffer_data(&CUBE_INDICES, Context::STATIC_DRAW);
         }
         // Register the vertex and element array buffers with the VAO
         {
@@ -214,7 +272,8 @@ pub fn main() -> Result<(), JsValue>
     {
         tex_handle: texture_handle_t1,
         vert_arr_handle: vert_arr_handle,
-        num_indices: 3
+        num_indices: 36,
+        //num_indices: 3
     };
     let t2 = RenderDto
     {
@@ -340,13 +399,14 @@ pub fn main() -> Result<(), JsValue>
                                 Node(
                                     &t1,
                                     transformation_t1.matrix(),
-                                    Some(vec![
+                                    None
+    /*                                Some(vec![
                                         Node(
                                             &t2,
                                             transformation_t2.matrix(),
                                             None
                                         ),
-                                    ])
+                                    ])*/
                                 ),
                             ];
 
@@ -358,7 +418,6 @@ pub fn main() -> Result<(), JsValue>
                     if input_listener.key_state(Key_ArrowLeft) == InputState::Down
                     {
                         camera.move_cam_lat(0.1);
-                        crate::log("aa");
                     }
                     if input_listener.key_state(Key_ArrowRight) == InputState::Down
                     {

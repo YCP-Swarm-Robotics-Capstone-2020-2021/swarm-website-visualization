@@ -157,7 +157,7 @@ impl Camera
 
     pub fn move_cam_lat(&mut self, delta: f32)
     {
-        self.translation += self.orientation * (delta * self.world_right);
+        self.translation += (self.orientation * (delta * self.world_right));
     }
 
     pub fn move_cam_vert(&mut self, delta: f32)
@@ -210,19 +210,18 @@ impl Camera
 
     pub fn rotate_cam_yaw(&mut self, theta: f32)
     {
-        self.orientation = (self.orientation * Quaternion::from_axis_angle(self.orientation * self.world_up, Deg(theta))).normalize();
+        self.rotate_cam(Quaternion::from_axis_angle(self.orientation * self.world_up, Deg(theta)));
     }
 
     pub fn rotate_cam_pitch(&mut self, theta: f32)
     {
-        self.orientation = (self.orientation * Quaternion::from_axis_angle(self.orientation * self.world_right, Deg(theta))).normalize();
+        self.rotate_cam(Quaternion::from_axis_angle(self.orientation * self.world_right, Deg(theta)));
     }
 
     pub fn rotate_cam_roll(&mut self, theta: f32)
     {
-        self.orientation = (self.orientation * Quaternion::from_axis_angle(self.orientation * self.world_forward, Deg(theta))).normalize();
+        self.rotate_cam(Quaternion::from_axis_angle(self.orientation * self.world_forward, Deg(theta)));
     }
-
 
     pub fn set_orientation(&mut self, orientation: Quaternion<f32>)
     {
@@ -352,11 +351,12 @@ impl Camera
 
     pub fn view_matrix(&self) -> Matrix4<f32>
     {
-        let eye_pos = self.get_zoomed_eye_pos();
-        let mut view = Matrix4::look_at(Point3::new(eye_pos.x, eye_pos.y, eye_pos.z), Point3::new(self.looking_at.x, self.looking_at.y, self.looking_at.z), self.world_up)
-            * Into::<Matrix4<f32>>::into(self.orientation);
-        crate::log_s(format!("{:?}", view));
-        view[3] = self.translation.extend(1.0);
+        // let eye_pos = self.get_zoomed_eye_pos();
+        let mut view = Matrix4::look_at(Point3::new(self.eye_pos.x, self.eye_pos.y, self.eye_pos.z), Point3::new(self.looking_at.x, self.looking_at.y, self.looking_at.z), self.world_up)
+            * Matrix4::from(self.orientation);//Into::<Matrix4<f32>>::into(self.orientation);
+        //view[3] = self.translation.extend(1.0);
+        view[3] = view[0] * self.translation[0] + view[1] * self.translation[1] + view[2] * self.translation[2] + view[3];
+        //crate::log_s(format!("{:?}", view));
         view
     }
 }
