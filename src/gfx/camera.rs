@@ -369,15 +369,15 @@ mod tests
             looking_at: vec3(0.0, 0.0, 0.1),
 
             world_up: vec3(0.0, 1.0, 0.0),
-            world_forward: vec3(0.0, 0.0, 0.1),
-            world_right: vec3(-0.1, 0.0, 0.0),
+            world_forward: vec3(0.0, 0.0, 1.0),
+            world_right: vec3(-1.0, 0.0, 0.0),
 
             orientation: Quaternion::new(1.0, 0.0, 0.0, 0.0),
             translation: vec3(0.0, 0.0, 0.0),
 
             zoom: 0.0,
             zoom_min: 0.0,
-            zoom_max: 0.0
+            zoom_max: f32::MAX
         };
 
     #[test]
@@ -404,5 +404,40 @@ mod tests
         );
 
         assert_eq!(TEST_CAM, cam);
+    }
+    #[test]
+    fn test_set_world_translation()
+    {
+        let mut cam = TEST_CAM;
+        let translation = vec3(1.0, 2.0, 4.0);
+        cam.set_world_translation(translation);
+        assert_eq!(translation, cam.translation);
+    }
+    #[test]
+    fn test_move_world_lat()
+    {
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_world_lat(delta);
+        assert_eq!(vec3(-3.0, 0.0, 0.0), cam.translation);
+
+        // TODO: Test in conjunction with other translations
+    }
+    #[test]
+    fn test_move_world_vert()
+    {
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_world_vert(delta);
+        assert_eq!(vec3(0.0, 3.0, 0.0), cam.translation);
+
+        // TODO:
+    }
+    #[test]
+    fn test_move_world_long()
+    {
+        let mut cam = TEST_CAM
     }
 }
