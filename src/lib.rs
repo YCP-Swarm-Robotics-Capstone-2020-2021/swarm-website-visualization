@@ -324,7 +324,7 @@ pub fn main() -> Result<(), JsValue>
                     {
                         //camera.move_cam_lat(event.movement_x() as f32 / 800.0);
                         let delta = if event.movement_x() < 0 { -1.0 } else { 1.0 };
-                        camera.rotate_cam_yaw(delta);
+                        camera.rotate_world_yaw(delta);
                     }
                     if event.movement_y() != 0
                     {
