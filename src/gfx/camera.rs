@@ -1,19 +1,4 @@
-use cgmath::
-{
-    Vector3,
-    vec3,
-    Vector4,
-    vec4,
-    Point3,
-    Matrix3,
-    Matrix4,
-    Quaternion,
-    Rad,
-    Deg,
-    Rotation3,
-    ElementWise,
-    InnerSpace,
-};
+use cgmath::{Vector3, vec3, Vector4, vec4, Point3, Matrix3, Matrix4, Quaternion, Rad, Deg, Rotation3, ElementWise, InnerSpace, Rotation};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Camera
@@ -96,10 +81,10 @@ impl Camera
         {
             eye_pos,
             looking_at,
-            world_up,
-            world_forward,
-            world_right,
-            orientation: Quaternion::from_axis_angle(world_up, Rad(0.0)),
+            world_up: world_up.normalize(),
+            world_forward: world_forward.normalize(),
+            world_right: world_right.normalize(),
+            orientation: Quaternion::from_axis_angle(world_up.normalize(), Rad(0.0)),
             translation: vec3(0.0, 0.0, 0.0),
             zoom: 0.0,
             zoom_min: 0.0,
@@ -121,7 +106,7 @@ impl Camera
 
     pub fn move_world_vert(&mut self, delta: f32)
     {
-        self.translation += self.world_forward * delta;
+        self.translation += self.world_up * delta;
     }
 
     pub fn move_world_long(&mut self, delta: f32)
@@ -353,10 +338,8 @@ impl Camera
     {
         // let eye_pos = self.get_zoomed_eye_pos();
         let mut view = Matrix4::look_at(Point3::new(self.eye_pos.x, self.eye_pos.y, self.eye_pos.z), Point3::new(self.looking_at.x, self.looking_at.y, self.looking_at.z), self.world_up)
-            * Matrix4::from(self.orientation);//Into::<Matrix4<f32>>::into(self.orientation);
-        //view[3] = self.translation.extend(1.0);
+            * Matrix4::from(self.orientation);
         view[3] = view[0] * self.translation[0] + view[1] * self.translation[1] + view[2] * self.translation[2] + view[3];
-        //crate::log_s(format!("{:?}", view));
         view
     }
 }

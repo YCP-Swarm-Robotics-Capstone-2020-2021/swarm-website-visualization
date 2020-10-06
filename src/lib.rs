@@ -98,40 +98,40 @@ const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
 const CUBE_VERTICES: [Vertex; 24] =
     [
         // Back face
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [0.0, 1.0] }, /* Top Left    */
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [1.0, 1.0] }, /* Top Right   */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [0.0, 0.0] }, /* Bottom Left */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [1.0, 0.0] }, /* Bottom Right*/
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [0.0/6.0, 1.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [0.0/6.0, 0.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [1.0/6.0, 0.0/6.0] }, /* Bottom Right*/
 
         // Front face
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [1.0, 2.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [2.0, 2.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [1.0, 1.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [2.0, 1.0] }, /* Bottom Right*/
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [1.0/6.0, 2.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [2.0/6.0, 1.0/6.0] }, /* Bottom Right*/
 
         // Left face
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [2.0, 3.0] }, /* Top Left    */
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [3.0, 3.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [2.0, 2.0] }, /* Bottom Left */
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [3.0, 2.0] }, /* Bottom Right*/
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [2.0/6.0, 3.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [3.0/6.0, 2.0/6.0] }, /* Bottom Right*/
 
         // Right face
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [3.0, 4.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [4.0, 4.0] }, /* Top Right   */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [3.0, 3.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [4.0, 3.0] }, /* Bottom Right*/
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [3.0/6.0, 4.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [4.0/6.0, 3.0/6.0] }, /* Bottom Right*/
 
         // Top face
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [4.0, 5.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [5.0, 5.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [4.0, 4.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [5.0, 4.0] }, /* Bottom Right*/
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [4.0/6.0, 5.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [5.0/6.0, 4.0/6.0] }, /* Bottom Right*/
 
         // Bottom face
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [5.0, 6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [6.0, 6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [5.0, 5.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [6.0, 5.0] }, /* Bottom Right*/
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [5.0/6.0, 6.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [6.0/6.0, 6.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [6.0/6.0, 5.0/6.0] }, /* Bottom Right*/
     ];
 const CUBE_INDICES: [u32; 36] =
     [
@@ -249,6 +249,8 @@ pub fn main() -> Result<(), JsValue>
     // Log any errors that may have occurred during setup
     crate::log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
+    context.enable(Context::CULL_FACE);
+    context.enable(Context::DEPTH_TEST);
     // Wrap the context in an Rc<RefCell<>>
     wrap!(context);
 
@@ -322,6 +324,8 @@ pub fn main() -> Result<(), JsValue>
                     if event.movement_y() != 0
                     {
                         //camera.move_cam_vert(event.movement_y() as f32 / 800.0);
+                        let delta = if event.movement_y() < 0 { -1.0 } else { 1.0 };
+                        camera.rotate_cam_pitch(delta);
                     }
                 }
             };
@@ -391,7 +395,7 @@ pub fn main() -> Result<(), JsValue>
                         borrow!(context);
                         // Reset the render area
                         context.clear_color(0.0, 0.0, 0.0, 1.0);
-                        context.clear(Context::COLOR_BUFFER_BIT);
+                        context.clear(Context::COLOR_BUFFER_BIT | Context::DEPTH_BUFFER_BIT);
 
                         // Setup scene graph
                         let nodes =
