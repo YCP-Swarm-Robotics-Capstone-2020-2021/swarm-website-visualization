@@ -270,6 +270,10 @@ pub fn main() -> Result<(), JsValue>
     // Setup render information for triangle
     let mut transformation_t1 = Transformation::new();
     let mut transformation_t2 = Transformation::new();
+    transformation_t2.global.scale(&vec3(0.5, 0.5, 0.5));
+    transformation_t2.global.translate(&vec3(-1.0, 0.0, 0.0));
+    let mut transformation_t3 = Transformation::new();
+    transformation_t3.global.translate(&vec3(2.0, 0.0, 0.0));
     let t1 = RenderDto
     {
         tex_handle: texture_handle_t1,
@@ -284,24 +288,25 @@ pub fn main() -> Result<(), JsValue>
         num_indices: 3
     };
 
-    let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 10.0f32);
+    let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 20.0f32);
     let mut camera = Rc::new(RefCell::new(
         Camera::from_eye(
             vec3(0.0, 0.0, 0.0),
-            vec3(0.0, 0.0, 1.0),
+            vec3(0.0, 0.0, -1.0),
             vec3(0.0, 1.0, 0.0)
         )));
+    camera.borrow_mut().move_cam_locked(vec3(-1.0, 0.0, 6.0));
     {
         clone!(camera);
         let callback = move |event: web_sys::WheelEvent|
             {
                 if event.delta_y() > 0.0
                 {
-                    camera.borrow_mut().move_cam_long(0.1);
+                    camera.borrow_mut().move_cam_long_locked(0.1);
                 }
                 else if event.delta_y() < 0.0
                 {
-                    camera.borrow_mut().move_cam_long(-0.1);
+                    camera.borrow_mut().move_cam_long_locked(-0.1);
                 }
             };
         let ev = EventListener::new(&canvas, "wheel", callback).expect("zoom event listener");
@@ -361,32 +366,9 @@ pub fn main() -> Result<(), JsValue>
                     // Perform any updates skipped due to missed frames
                     while accumulator >= delta_time
                     {
-                        //transformation_t1.global.translate(&vec3(speed * dir * delta_time, 0.0, 0.0));
                         transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
-
-                        transformation_t2.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
-
-                        // Triangle movement bounds
-                        /*                        let translation =
-                                                    {
-                                                        let mut t = transformation_t1.global.get_translation().clone();
-                                                        if dir == -1.0
-                                                        {
-                                                            t.x = f32::max(-0.5, t.x);
-                                                        }
-                                                        else if dir == 1.0
-                                                        {
-                                                            t.x = f32::min(0.5, t.x);
-                                                        }
-                                                        t
-                                                    };
-
-                                                transformation_t1.global.set_translation(translation);
-                                                // Reverse triangle direction if out of the bounds
-                                                if transformation_t1.translation().x <= -0.5 || transformation_t1.translation().x >= 0.5
-                                                {
-                                                    dir *= -1.0;
-                                                }*/
+                        transformation_t2.local.rotate_angle_axis(Deg(20.0 * delta_time), &vec3(1.0, 1.0, 1.0));
+                        transformation_t3.local.rotate_angle_axis(Deg( 5.0 * delta_time), &vec3(1.0, 1.0, 0.0));
 
                         accumulator -= delta_time;
                     }
@@ -403,14 +385,19 @@ pub fn main() -> Result<(), JsValue>
                                 Node(
                                     &t1,
                                     transformation_t1.matrix(),
-                                    None
-    /*                                Some(vec![
+                                    //None
+                                    Some(vec![
                                         Node(
-                                            &t2,
+                                            &t1,
                                             transformation_t2.matrix(),
                                             None
                                         ),
-                                    ])*/
+                                    ])
+                                ),
+                                Node(
+                                    &t1,
+                                    transformation_t3.matrix(),
+                                    None
                                 ),
                             ];
 

@@ -142,17 +142,17 @@ impl Camera
 
     pub fn move_cam_lat(&mut self, delta: f32)
     {
-        self.translation += (self.orientation * (delta * self.world_right));
+        self.translation += (self.orientation.invert() * (delta * self.world_right));
     }
 
     pub fn move_cam_vert(&mut self, delta: f32)
     {
-        self.translation += self.orientation * (delta * self.world_up);
+        self.translation += self.orientation.invert() * (-delta * self.world_up);
     }
 
     pub fn move_cam_long(&mut self, delta: f32)
     {
-        self.translation += self.orientation * (delta * self.world_forward);
+        self.translation += self.orientation.invert() * (delta * self.world_forward);
     }
 
     pub fn move_cam(&mut self, delta: Vector3<f32>)
@@ -164,7 +164,7 @@ impl Camera
 
     pub fn move_cam_lat_locked(&mut self, delta: f32)
     {
-        let delta_lat = self.orientation * (delta * self.world_right);
+        let delta_lat = self.orientation.invert() * (delta * self.world_right);
         self.translation += vec3(delta_lat.x, 0.0, delta_lat.z);
     }
 
@@ -175,7 +175,7 @@ impl Camera
 
     pub fn move_cam_long_locked(&mut self, delta: f32)
     {
-        let delta_lat = self.orientation * (delta * self.world_forward);
+        let delta_lat = self.orientation.invert() * (delta * self.world_forward);
         self.translation += vec3(delta_lat.x, 0.0, delta_lat.z);
     }
 
@@ -195,17 +195,17 @@ impl Camera
 
     pub fn rotate_cam_yaw(&mut self, theta: f32)
     {
-        self.rotate_cam(Quaternion::from_axis_angle(self.orientation * self.world_up, Deg(theta)));
+        self.rotate_cam(Quaternion::from_axis_angle(self.orientation.invert() * self.world_up, Deg(theta)));
     }
 
     pub fn rotate_cam_pitch(&mut self, theta: f32)
     {
-        self.rotate_cam(Quaternion::from_axis_angle(self.orientation * self.world_right, Deg(theta)));
+        self.rotate_cam(Quaternion::from_axis_angle(self.orientation.invert() * self.world_right, Deg(theta)));
     }
 
     pub fn rotate_cam_roll(&mut self, theta: f32)
     {
-        self.rotate_cam(Quaternion::from_axis_angle(self.orientation * self.world_forward, Deg(theta)));
+        self.rotate_cam(Quaternion::from_axis_angle(self.orientation.invert() * self.world_forward, Deg(theta)));
     }
 
     pub fn set_orientation(&mut self, orientation: Quaternion<f32>)
