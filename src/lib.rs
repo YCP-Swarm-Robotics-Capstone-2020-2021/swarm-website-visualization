@@ -68,6 +68,7 @@ use crate::
     math::transform::{Transformation},
 };
 use cgmath::{Matrix4, vec3, Deg, InnerSpace};
+extern crate nalgebra_glm as glm;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -251,6 +252,7 @@ pub fn main() -> Result<(), JsValue>
 
     context.enable(Context::CULL_FACE);
     context.enable(Context::DEPTH_TEST);
+    context.viewport(0, 0, 800, 800);
     // Wrap the context in an Rc<RefCell<>>
     wrap!(context);
 
@@ -270,6 +272,7 @@ pub fn main() -> Result<(), JsValue>
     // Setup render information for triangle
     let mut transformation_t1 = Transformation::new();
     let mut transformation_t2 = Transformation::new();
+    transformation_t2.local.translate(&vec3(-2.0, 0.0, 0.0));
     let t1 = RenderDto
     {
         tex_handle: texture_handle_t1,
@@ -287,9 +290,9 @@ pub fn main() -> Result<(), JsValue>
     let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 10.0f32);
     let mut camera = Rc::new(RefCell::new(
         Camera::from_eye(
-            vec3(0.0, 0.0, 0.0),
-            vec3(0.0, 0.0, 1.0),
-            vec3(0.0, 1.0, 0.0)
+            glm::vec3(0.0, 0.0, 0.0),
+            glm::vec3(0.0, 0.0, 1.0),
+            glm::vec3(0.0, 1.0, 0.0)
         )));
     {
         clone!(camera);
@@ -297,11 +300,11 @@ pub fn main() -> Result<(), JsValue>
             {
                 if event.delta_y() > 0.0
                 {
-                    camera.borrow_mut().move_cam_long(0.1);
+                    camera.borrow_mut().move_cam_long_locked(0.1);
                 }
                 else if event.delta_y() < 0.0
                 {
-                    camera.borrow_mut().move_cam_long(-0.1);
+                    camera.borrow_mut().move_cam_long_locked(-0.1);
                 }
             };
         let ev = EventListener::new(&canvas, "wheel", callback).expect("zoom event listener");
@@ -319,7 +322,7 @@ pub fn main() -> Result<(), JsValue>
                     {
                         //camera.move_cam_lat(event.movement_x() as f32 / 800.0);
                         let delta = if event.movement_x() < 0 { -1.0 } else { 1.0 };
-                        camera.rotate_cam_yaw(delta);
+                        camera.rotate_world_yaw(delta);
                     }
                     if event.movement_y() != 0
                     {
@@ -362,9 +365,9 @@ pub fn main() -> Result<(), JsValue>
                     while accumulator >= delta_time
                     {
                         //transformation_t1.global.translate(&vec3(speed * dir * delta_time, 0.0, 0.0));
-                        transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
+                        //transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
 
-                        transformation_t2.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
+                        //transformation_t2.global.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
 
                         // Triangle movement bounds
                         /*                        let translation =
@@ -403,37 +406,39 @@ pub fn main() -> Result<(), JsValue>
                                 Node(
                                     &t1,
                                     transformation_t1.matrix(),
-                                    None
-    /*                                Some(vec![
+                                    //None
+                                    Some(vec![
                                         Node(
-                                            &t2,
+                                            &t1,
                                             transformation_t2.matrix(),
                                             None
                                         ),
-                                    ])*/
+                                    ])
                                 ),
                             ];
 
-                        renderer.render(&context, &manager.borrow(), perspective * camera.borrow().view_matrix(), &nodes);
+                        let v = camera.borrow().view_matrix();
+                        let pv = glm::perspective(glm::radians(&glm::vec1(45.0)).x, 1.0f32, 0.1f32, 10.0f32) * v;
+                        renderer.render(&context, &manager.borrow(), Matrix4::from(*pv.as_ref()), &nodes);
                     }
 
                     // Input state tests
                     borrow_mut!(camera);
                     if input_listener.key_state(Key_ArrowLeft) == InputState::Down
                     {
-                        camera.move_cam_lat(0.1);
+                        camera.move_cam_lat_locked(0.1);
                     }
                     if input_listener.key_state(Key_ArrowRight) == InputState::Down
                     {
-                        camera.move_cam_lat(-0.1);
+                        camera.move_cam_lat_locked(-0.1);
                     }
                     if input_listener.key_state(Key_ArrowUp) == InputState::Down
                     {
-                        camera.move_cam_vert(0.1);
+                        camera.move_cam_vert_locked(0.1);
                     }
                     if input_listener.key_state(Key_ArrowDown) == InputState::Down
                     {
-                        camera.move_cam_vert(-0.1);
+                        camera.move_cam_vert_locked(-0.1);
                     }
 
                 }

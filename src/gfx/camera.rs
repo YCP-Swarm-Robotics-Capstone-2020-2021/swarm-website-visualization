@@ -1,7 +1,5 @@
 extern crate nalgebra_glm as glm;
 
-use self::glm::Quat;
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Camera
 {
@@ -58,13 +56,14 @@ impl Camera
     /// `world_up` is "up" direction of the world from the camera's view
     pub fn from_eye(eye_pos: glm::Vec3, looking_at: glm::Vec3, world_up: glm::Vec3) -> Camera
     {
-        let world_forward = looking_at.sub_element_wise(eye_pos.clone());
+        let world_forward = looking_at - eye_pos;
+        //let world_forward = looking_at.sub_element_wise(eye_pos.clone());
         Camera::from_eye_and_world(
             eye_pos,
             looking_at,
             world_up,
             world_forward,
-            world_forward.cross(world_up.clone())
+            world_forward.cross(&world_up)
         )
     }
 
@@ -127,13 +126,13 @@ impl Camera
 
     pub fn rotate_world_yaw(&mut self, theta: f32)
     {
-        self.orientation = (self.orientation * glm::quat_angle_axis(glm::radians(&glm::vec1(theta)).x, &self.world_up.clone())).normalize();
+        self.orientation = (self.orientation * glm::quat_angle_axis(glm::radians(&glm::vec1(theta)).x, &self.world_up)).normalize();
         //self.orientation = (self.orientation * Quaternion::from_axis_angle(self.world_up, Deg(theta))).normalize();
     }
 
     pub fn rotate_world_pitch(&mut self, theta: f32)
     {
-        self.orientation = (self.orientation * glm::quat_angle_axis(glm::radians(&glm::vec1(theta)).x, &self.world_right.clone())).normalize();
+        self.orientation = (self.orientation * glm::quat_angle_axis(glm::radians(&glm::vec1(theta)).x, &self.world_right)).normalize();
         //self.orientation = (self.orientation * Quaternion::from_axis_angle(self.world_right, Deg(theta))).normalize();
     }
 
@@ -146,17 +145,17 @@ impl Camera
 
     pub fn move_cam_lat(&mut self, delta: f32)
     {
-        self.translation += (self.orientation * (&self.world_right * delta));
+        self.translation += glm::quat_rotate_vec3(&self.orientation, &(&self.world_right * delta));
     }
 
     pub fn move_cam_vert(&mut self, delta: f32)
     {
-        self.translation += self.orientation * (&self.world_up * delta);
+        self.translation += glm::quat_rotate_vec3(&self.orientation, &(&self.world_up * delta));
     }
 
     pub fn move_cam_long(&mut self, delta: f32)
     {
-        self.translation += self.orientation * (&self.world_forward * delta);
+        self.translation += glm::quat_rotate_vec3(&self.orientation, &(&self.world_forward * delta));
     }
 
     pub fn move_cam(&mut self, delta: glm::Vec3)
@@ -168,7 +167,8 @@ impl Camera
 
     pub fn move_cam_lat_locked(&mut self, delta: f32)
     {
-        let delta_lat = self.orientation * (&self.world_right * delta);
+        //let delta_lat = glm::quat_rotate_vec3(&self.orientation, &(&self.world_right * delta));
+        let delta_lat = glm::quat_rotate_vec3(&glm::quat_inverse(&self.orientation), &(&self.world_right * delta));
         self.translation += glm::vec3(delta_lat.x, 0.0, delta_lat.z);
     }
 
@@ -179,7 +179,8 @@ impl Camera
 
     pub fn move_cam_long_locked(&mut self, delta: f32)
     {
-        let delta_lat = self.orientation * (&self.world_forward * delta);
+        //let delta_lat = glm::quat_rotate_vec3(&self.orientation, &(&self.world_forward * delta));
+        let delta_lat = glm::quat_rotate_vec3(&glm::quat_inverse(&self.orientation), &(&self.world_forward * delta));
         self.translation += glm::vec3(delta_lat.x, 0.0, delta_lat.z);
     }
 
@@ -199,13 +200,15 @@ impl Camera
 
     pub fn rotate_cam_yaw(&mut self, theta: f32)
     {
-        self.rotate_cam(glm::quat_angle_axis(glm::radians(&glm::vec1(theta)).x, &self.world_up));
+        let world_up = glm::quat_rotate_vec3(&glm::quat_inverse(&self.orientation), &self.world_up);
+        self.rotate_cam(glm::quat_angle_axis(glm::radians(&glm::vec1(theta)).x, &world_up));
         //self.rotate_cam(Quaternion::from_axis_angle(self.orientation * self.world_up, Deg(theta)));
     }
 
     pub fn rotate_cam_pitch(&mut self, theta: f32)
     {
-        self.rotate_cam(glm::quat_angle_axis(glm::radians(&glm::vec1(theta)).x, &self.world_right));
+        let world_right = glm::quat_rotate_vec3(&glm::quat_inverse(&self.orientation), &self.world_right);
+        self.rotate_cam(glm::quat_angle_axis(glm::radians(&glm::vec1(theta)).x, &world_right));
         //self.rotate_cam(Quaternion::from_axis_angle(self.orientation * self.world_right, Deg(theta)));
     }
 
@@ -222,7 +225,7 @@ impl Camera
 
     pub fn reset_orientation(&mut self)
     {
-        self.orientation = Quaternion::from_axis_angle(vec3(0.0, 0.0, 0.0), Rad(0.0));
+        self.orientation = glm::quat_angle_axis(0.0, &glm::vec3(0.0, 0.0, 0.0));
     }
 
     /// Zoom
@@ -316,7 +319,7 @@ impl Camera
     /// Get the position of the camera's eye within the world
     pub fn get_world_eye_pos(&self) -> glm::Vec3
     {
-        (&self.orientation * (self.get_zoomed_eye_pos() - (self.zoom * &self.world_forward * 2.0))) + &self.translation
+        glm::quat_rotate_vec3(&self.orientation, &((self.get_zoomed_eye_pos() - (self.zoom * &self.world_forward * 2.0)) + &self.translation))
     }
 
     /// Get the position of the camera within the world adjusted to be from
@@ -349,7 +352,9 @@ impl Camera
         let mut
         view[3] = view[0] * self.translation[0] + view[1] * self.translation[1] + view[2] * self.translation[2] + view[3];
         view*/
-        glm::identity()
+        let mut view = glm::look_at(&self.eye_pos, &self.looking_at, &self.world_up) * glm::quat_cast(&self.orientation);
+        view = glm::translate(&view, &self.translation);
+        view
     }
 }
 
