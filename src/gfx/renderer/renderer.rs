@@ -34,19 +34,19 @@ pub struct RenderDto
 /// The second parameter is a model matrix and the third parameter is any child nodes
 pub struct Node<'a>(pub &'a RenderDto, pub &'a Matrix4<f32>, pub Option<Vec<Node<'a>>>);
 
-/// 2D Scene Renderer
-pub struct Renderer2D
+/// Scene Renderer
+pub struct Renderer
 {
     shader_program_handle: GlObjectHandle,
     uniform_buff_handle: GlObjectHandle,
 }
 
-impl Renderer2D
+impl Renderer
 {
-    /// Create a new Renderer2D instance
-    pub fn new(context: &Context, manager: &mut GlObjectManager) -> Result<Renderer2D, GfxError>
+    /// Create a new Renderer instance
+    pub fn new(context: &Context, manager: &mut GlObjectManager) -> Result<Renderer, GfxError>
     {
-        let renderer = Renderer2D
+        let renderer = Renderer
         {
             shader_program_handle: manager.insert_shader_program(
                 ShaderProgram::new(&context, Some(shader_source::TEXTURE_VERT.to_string()), Some(shader_source::TEXTURE_FRAG.to_string()))?,
@@ -58,8 +58,8 @@ impl Renderer2D
         // Setup the renderer's uniform buffer
         ShaderProgram::bind(manager, renderer.shader_program_handle);
         UniformBuffer::bind(manager, renderer.uniform_buff_handle);
-        let mut shader_program = manager.get_mut_shader_program(renderer.shader_program_handle).expect("renderer2d shader program");
-        let mut uniform_buffer = manager.get_mut_uniform_buffer(renderer.uniform_buff_handle).expect("renderer2d uniform buffer");
+        let mut shader_program = manager.get_mut_shader_program(renderer.shader_program_handle).expect("renderer shader program");
+        let mut uniform_buffer = manager.get_mut_uniform_buffer(renderer.uniform_buff_handle).expect("renderer uniform buffer");
         // Set the shader sampler2d to TEXTURE0
         shader_program.set_uniform_i32("tex", &[0])?;
         uniform_buffer.add_vert_block(&mut shader_program, "VertData")?;
@@ -77,7 +77,7 @@ impl Renderer2D
         ShaderProgram::bind(manager, self.shader_program_handle);
         UniformBuffer::bind(manager, self.uniform_buff_handle);
 
-        let mut uniform_buffer: RefMut<UniformBuffer> = manager.get_mut_uniform_buffer(self.uniform_buff_handle).expect("renderer2d uniform buffer");
+        let mut uniform_buffer: RefMut<UniformBuffer> = manager.get_mut_uniform_buffer(self.uniform_buff_handle).expect("renderer uniform buffer");
         // context.active_texture(Context::TEXTURE0);
         manager.set_active_texture(&context, Context::TEXTURE0);
 

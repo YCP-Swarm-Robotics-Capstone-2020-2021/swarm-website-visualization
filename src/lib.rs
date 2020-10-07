@@ -37,11 +37,11 @@ use crate::
         render_loop::RenderLoop,
         renderer::
         {
-            renderer2d::
+            renderer::
             {
                 RenderDto,
                 Node,
-                Renderer2D,
+                Renderer,
             },
             vertex::Vertex,
         },
@@ -249,7 +249,7 @@ pub fn main() -> Result<(), JsValue>
     let delta_time: f32 = 0.01;
     let mut accumulator: f32 = 0.0;
 
-    let renderer = Renderer2D::new(&context.borrow(), &mut manager.borrow_mut()).expect("2d renderer");
+    let renderer = Renderer::new(&context.borrow(), &mut manager.borrow_mut()).expect("renderer");
 
     // Setup render information for triangle
     let mut transformation_t1 = Transformation::new();
