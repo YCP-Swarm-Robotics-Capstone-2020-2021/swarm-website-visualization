@@ -1,4 +1,18 @@
-use cgmath::{Vector3, vec3, Vector4, vec4, Point3, Matrix3, Matrix4, Quaternion, Rad, Deg, Rotation3, ElementWise, InnerSpace, Rotation};
+#![allow(dead_code)]
+use cgmath::
+{
+    Vector3,
+    vec3,
+    Point3,
+    Matrix4,
+    Quaternion,
+    Rad,
+    Deg,
+    Rotation3,
+    ElementWise,
+    InnerSpace,
+    Rotation
+};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Camera
@@ -44,6 +58,9 @@ impl Camera
     ///     i.e. "locking" the camera to its current "height".
     ///     This is good for stuff like a character walking around, as the
     ///     camera can look up/down while staying at the same height
+    ///
+    /// See individual function documentation for any additional
+    /// notes specific to that function in particular
 
     // TODO: Cache results from functions that return computed values
 
@@ -106,12 +123,12 @@ impl Camera
 
     pub fn move_world_vert(&mut self, delta: f32)
     {
-        self.translation += self.world_up * delta;
+        self.translation += delta * self.world_up;
     }
 
     pub fn move_world_long(&mut self, delta: f32)
     {
-        self.translation += self.world_forward * delta;
+        self.translation += delta * self.world_forward;
     }
 
     pub fn move_world(&mut self, delta: Vector3<f32>)
@@ -142,7 +159,7 @@ impl Camera
 
     pub fn move_cam_lat(&mut self, delta: f32)
     {
-        self.translation += (self.orientation.invert() * (delta * self.world_right));
+        self.translation += self.orientation.invert() * (delta * self.world_right);
     }
 
     pub fn move_cam_vert(&mut self, delta: f32)
@@ -172,6 +189,8 @@ impl Camera
         self.translation += vec3(delta_lat.x, 0.0, delta_lat.z);
     }
 
+    /// Move the camera with respect to the original,
+    /// unaltered `world_up` given to the constructor
     pub fn move_cam_vert_locked(&mut self, delta: f32)
     {
         self.move_world_vert(-delta);
@@ -360,16 +379,10 @@ mod tests
     use crate::gfx::camera::Camera;
     use cgmath::
     {
-        Vector3,
         vec3,
-        Matrix3,
-        Matrix4,
         Quaternion,
         Rad,
-        Deg,
         Rotation3,
-        ElementWise,
-        InnerSpace,
     };
 
     const TEST_CAM: Camera =
@@ -511,27 +524,57 @@ mod tests
     #[test]
     fn test_move_cam()
     {
-        unimplemented!("test_move_cam()");
+        let mut cam = TEST_CAM;
+        let delta = vec3(5.0, 1.0, 4.0);
+
+        cam.move_cam(delta);
+        assert_eq!(vec3(-5.0, -1.0, 4.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
     }
     #[test]
     fn test_move_cam_lat_locked()
     {
-        unimplemented!("test_move_cam_lat_locked()");
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_cam_lat_locked(delta);
+        assert_eq!(vec3(-3.0, 0.0, 0.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
     }
     #[test]
     fn test_move_cam_vert_locked()
     {
-        unimplemented!("test_move_cam_vert_locked()");
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_cam_vert_locked(delta);
+        assert_eq!(vec3(0.0, -3.0, 0.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
     }
     #[test]
     fn test_move_cam_long_locked()
     {
-        unimplemented!("test_move_cam_long_locked()");
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_cam_long_locked(delta);
+        assert_eq!(vec3(0.0, 0.0, 3.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
     }
     #[test]
     fn test_move_cam_locked()
     {
-        unimplemented!("test_move_cam_locked()");
+        let mut cam = TEST_CAM;
+        let delta = vec3(5.0, 1.0, 4.0);
+
+        cam.move_cam_locked(delta);
+        assert_eq!(vec3(-5.0, -1.0, 4.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
     }
     #[test]
     fn test_rotate_cam()
@@ -556,11 +599,23 @@ mod tests
     #[test]
     fn test_set_orientation()
     {
-        unimplemented!("test_set_orientation()");
+        let mut cam = TEST_CAM;
+        let ort = Quaternion::new(5.0, 10.0, 3.0, 4.0);
+
+        cam.set_orientation(ort);
+        assert_eq!(ort, cam.orientation);
     }
     #[test]
     fn test_reset_orientation()
     {
-        unimplemented!("test_reset_orientation()");
+        let mut cam = TEST_CAM;
+        let ort = Quaternion::new(5.0, 10.0, 3.0, 4.0);
+
+        cam.set_orientation(ort);
+        cam.reset_orientation();
+        assert_eq!(Quaternion::from_axis_angle(vec3(0.0, 0.0, 0.0), Rad(0.0)), cam.orientation);
     }
+    // TODO: Zoom functions
+
+    // TODO: Getters
 }

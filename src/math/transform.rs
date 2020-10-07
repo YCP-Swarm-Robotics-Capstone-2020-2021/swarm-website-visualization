@@ -274,7 +274,6 @@ impl Transformation
 mod tests
 {
     use crate::math::transform::*;
-    use cgmath::prelude::*;
     use cgmath::Deg;
 
     const I: [f32; 16] =
@@ -389,7 +388,7 @@ mod tests
         t.global.translate(vec3(-1.0, -1.0, 0.0));
         assert_eq!(vec3(0.00000011920929, -0.00000011920929, -0.00000011920929), *t.global.get_translation());
 
-        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        //let m: &[f32; 16] = t.global.as_matrix().as_ref();
         //TODO: These assertions are *technically* true, but fail because of
         // rounding precision errors
         //assert_eq!(I, *m);

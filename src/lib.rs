@@ -16,7 +16,6 @@ use std::
 {
     rc::Rc,
     cell::RefCell,
-    boxed::Box,
     time::Duration,
 };
 
@@ -48,9 +47,8 @@ use crate::
         },
         gl_object::
         {
-            traits::{GlObject, Bindable},
+            traits::GlObject,
             buffer::Buffer,
-            uniform_buffer::UniformBuffer,
             ArrayBuffer,
             ElementArrayBuffer,
             vertex_array::{AttribPointer, VertexArray},
@@ -67,7 +65,7 @@ use crate::
     },
     math::transform::{Transformation},
 };
-use cgmath::{Matrix4, vec3, Deg, InnerSpace};
+use cgmath::{vec3, Deg};
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -87,12 +85,14 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
+#[allow(dead_code)]
 const TRIANGLE_VERTICESS: [Vertex; 3] =
     [
         Vertex { pos: [-0.5, -0.5, 1.0], tex: [0.0, 0.0] },
         Vertex { pos: [ 0.5, -0.5, 1.0], tex: [1.0, 0.0] },
         Vertex { pos: [ 0.0,  0.5, 1.0], tex: [0.5, 1.0] }
     ];
+#[allow(dead_code)]
 const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
 
 const CUBE_VERTICES: [Vertex; 24] =
@@ -160,6 +160,9 @@ pub fn main() -> Result<(), JsValue>
         };
     let context = new_context(&canvas)?;
 
+    context.enable(Context::CULL_FACE);
+    context.enable(Context::DEPTH_TEST);
+
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
     let mut manager_ref = manager.borrow_mut();
@@ -182,19 +185,6 @@ pub fn main() -> Result<(), JsValue>
                  51, 153, 102, 255,
                 128, 128, 128, 255,
             ]
-        }).expect("texture")
-    );
-
-    // Texture for triangle 2
-    let texture_handle_t2 = manager_ref.insert_texture2d(
-        Texture2d::new(&context, Texture2dParams
-        {
-            target: Context::TEXTURE_2D,
-            format: Context::RGBA,
-            size: (1, 1),
-            wrap_type: Context::REPEAT,
-            filter_type: Context::NEAREST,
-            data: vec![30.0 as u8, 144.0 as u8, 255.0 as u8, 255]
         }).expect("texture")
     );
 
@@ -249,15 +239,9 @@ pub fn main() -> Result<(), JsValue>
     // Log any errors that may have occurred during setup
     crate::log_s(format!("{:?}", crate::gfx::gl_get_errors(&context)));
 
-    context.enable(Context::CULL_FACE);
-    context.enable(Context::DEPTH_TEST);
     // Wrap the context in an Rc<RefCell<>>
     wrap!(context);
 
-    // Direction of triangle movement
-    let mut dir: f32 = 1.0;
-    // Speed factor of triangle movement
-    let speed: f32 = 0.5;
     // Get javascript performance ref for getting frame time
     let performance = window.performance().expect("performance");
     let mut last_time: Duration = Duration::new(0, 0);
@@ -279,17 +263,10 @@ pub fn main() -> Result<(), JsValue>
         tex_handle: texture_handle_t1,
         vert_arr_handle: vert_arr_handle,
         num_indices: 36,
-        //num_indices: 3
-    };
-    let t2 = RenderDto
-    {
-        tex_handle: texture_handle_t2,
-        vert_arr_handle: vert_arr_handle,
-        num_indices: 3
     };
 
     let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 20.0f32);
-    let mut camera = Rc::new(RefCell::new(
+    let camera = Rc::new(RefCell::new(
         Camera::from_eye(
             vec3(0.0, 0.0, 0.0),
             vec3(0.0, 0.0, -1.0),

@@ -1,7 +1,6 @@
 use std::
 {
-    rc::Rc,
-    cell::{RefCell, RefMut},
+    cell::RefMut,
 };
 
 use cgmath::Matrix4;
