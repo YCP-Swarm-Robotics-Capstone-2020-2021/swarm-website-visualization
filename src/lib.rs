@@ -86,7 +86,7 @@ fn log_s(s: String)
 }
 
 #[allow(dead_code)]
-const TRIANGLE_VERTICESS: [Vertex; 3] =
+const TRIANGLE_VERTICES: [Vertex; 3] =
     [
         Vertex { pos: [-0.5, -0.5, 1.0], tex: [0.0, 0.0] },
         Vertex { pos: [ 0.5, -0.5, 1.0], tex: [1.0, 0.0] },
@@ -359,11 +359,13 @@ pub fn main() -> Result<(), JsValue>
                         // Setup scene graph
                         let nodes =
                             vec![
+                                // Cubert
                                 Node(
                                     &t1,
                                     transformation_t1.matrix(),
                                     //None
                                     Some(vec![
+                                        // Cubling
                                         Node(
                                             &t1,
                                             transformation_t2.matrix(),
@@ -371,6 +373,7 @@ pub fn main() -> Result<(), JsValue>
                                         ),
                                     ])
                                 ),
+                                // Cuberta
                                 Node(
                                     &t1,
                                     transformation_t3.matrix(),
@@ -424,11 +427,8 @@ pub fn main() -> Result<(), JsValue>
     {
         let callback = move |event: web_sys::KeyboardEvent|
             {
-                if event.key() == Key_ArrowUp || event.key() == Key_ArrowDown
-                    || event.key() == Key_ArrowLeft || event.key() == Key_ArrowRight
-                {
-                    event.prevent_default();
-                }
+                // Prevent keypresses from interacting with surrounding web page
+                event.prevent_default();
                 if false
                 {
                     render_loop.borrow();
