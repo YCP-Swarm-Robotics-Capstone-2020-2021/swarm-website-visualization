@@ -147,6 +147,10 @@ impl Camera
 
     pub fn move_cam_vert(&mut self, delta: f32)
     {
+        // delta is negated here to flip the direction the world is moving
+        // to achieve the expected movement from the camera's view
+        //  i.e. a positive delta will make world move "up", which from
+        //  the camera's view it looks like the camera is moving "down"
         self.translation += self.orientation.invert() * (-delta * self.world_up);
     }
 
@@ -347,6 +351,12 @@ impl Camera
 #[cfg(test)]
 mod tests
 {
+    // TODO: The majority of these functions have todo comments with
+    //       "Test in conjunction with other transformations". This
+    //       needs to be done to ensure that movements and rotations
+    //       work correctly when a transformation is performed on
+    //       something other than the camera's default values
+
     use crate::gfx::camera::Camera;
     use cgmath::
     {
@@ -422,7 +432,7 @@ mod tests
         cam.move_world_lat(delta);
         assert_eq!(vec3(-3.0, 0.0, 0.0), cam.translation);
 
-        // TODO: Test in conjunction with other translations
+        // TODO: Test in conjunction with other transformations
     }
     #[test]
     fn test_move_world_vert()
@@ -433,11 +443,124 @@ mod tests
         cam.move_world_vert(delta);
         assert_eq!(vec3(0.0, 3.0, 0.0), cam.translation);
 
-        // TODO:
+        // TODO: Test in conjunction with other transformations
     }
     #[test]
     fn test_move_world_long()
     {
-        let mut cam = TEST_CAM
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_world_long(delta);
+        assert_eq!(vec3(0.0, 0.0, 3.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
+    }
+    #[test]
+    fn test_move_world()
+    {
+        let mut cam = TEST_CAM;
+        let delta = vec3(5.0, 1.0, 4.0);
+
+        cam.move_world(delta);
+        assert_eq!(vec3(-5.0, 1.0, 4.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
+    }
+    #[test]
+    fn test_rotate_world_yaw()
+    {
+        unimplemented!("test_rotate_world_yaw()");
+    }
+    #[test]
+    fn test_rotate_world_pitch()
+    {
+        unimplemented!("test_rotate_world_pitch()");
+    }
+    #[test]
+    fn test_move_cam_lat()
+    {
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_cam_lat(delta);
+        assert_eq!(vec3(-3.0, 0.0, 0.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
+    }
+    #[test]
+    fn test_move_cam_vert()
+    {
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_cam_vert(delta);
+        assert_eq!(vec3(0.0, -3.0, 0.0), cam.translation);
+    }
+    #[test]
+    fn test_move_cam_long()
+    {
+        let mut cam = TEST_CAM;
+        let delta = 3.0;
+
+        cam.move_cam_long(delta);
+        assert_eq!(vec3(0.0, 0.0, 3.0), cam.translation);
+
+        // TODO: Test in conjunction with other transformations
+    }
+    #[test]
+    fn test_move_cam()
+    {
+        unimplemented!("test_move_cam()");
+    }
+    #[test]
+    fn test_move_cam_lat_locked()
+    {
+        unimplemented!("test_move_cam_lat_locked()");
+    }
+    #[test]
+    fn test_move_cam_vert_locked()
+    {
+        unimplemented!("test_move_cam_vert_locked()");
+    }
+    #[test]
+    fn test_move_cam_long_locked()
+    {
+        unimplemented!("test_move_cam_long_locked()");
+    }
+    #[test]
+    fn test_move_cam_locked()
+    {
+        unimplemented!("test_move_cam_locked()");
+    }
+    #[test]
+    fn test_rotate_cam()
+    {
+        unimplemented!("test_rotate_cam()");
+    }
+    #[test]
+    fn test_rotate_cam_yaw()
+    {
+        unimplemented!("test_rotate_cam_yaw()");
+    }
+    #[test]
+    fn test_rotate_cam_pitch()
+    {
+        unimplemented!("test_rotate_cam_pitch()");
+    }
+    #[test]
+    fn test_rotate_cam_roll()
+    {
+        unimplemented!("test_rotate_cam_roll()");
+    }
+    #[test]
+    fn test_set_orientation()
+    {
+        unimplemented!("test_set_orientation()");
+    }
+    #[test]
+    fn test_reset_orientation()
+    {
+        unimplemented!("test_reset_orientation()");
     }
 }
