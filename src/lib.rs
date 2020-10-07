@@ -383,21 +383,35 @@ pub fn main() -> Result<(), JsValue>
 
                     // Input state tests
                     borrow_mut!(camera);
-                    if input_listener.key_state(Key_ArrowLeft) == InputState::Down
+                    let key_state = input_listener.key_state(Key_w);
+                    if key_state == InputState::Down || key_state == InputState::Repeating
+                    {
+                        camera.move_cam_long_locked(-0.1);
+                    }
+                    let key_state = input_listener.key_state(Key_s);
+                    if key_state == InputState::Down || key_state == InputState::Repeating
+                    {
+                        camera.move_cam_long_locked(0.1);
+                    }
+                    let key_state = input_listener.key_state(Key_a);
+                    if key_state == InputState::Down || key_state == InputState::Repeating
                     {
                         camera.move_cam_lat(0.1);
                     }
-                    if input_listener.key_state(Key_ArrowRight) == InputState::Down
+                    let key_state = input_listener.key_state(Key_d);
+                    if key_state == InputState::Down || key_state == InputState::Repeating
                     {
                         camera.move_cam_lat(-0.1);
                     }
-                    if input_listener.key_state(Key_ArrowUp) == InputState::Down
+                    let key_state = input_listener.key_state(Key_Space);
+                    if key_state == InputState::Down || key_state == InputState::Repeating
                     {
-                        camera.move_cam_vert(0.1);
+                        camera.move_cam_vert_locked(0.1);
                     }
-                    if input_listener.key_state(Key_ArrowDown) == InputState::Down
+                    let key_state = input_listener.key_state(Key_Control);
+                    if key_state == InputState::Down || key_state == InputState::Repeating
                     {
-                        camera.move_cam_vert(-0.1);
+                        camera.move_cam_vert_locked(-0.1);
                     }
 
                 }
