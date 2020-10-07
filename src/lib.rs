@@ -16,7 +16,6 @@ use std::
 {
     rc::Rc,
     cell::RefCell,
-    boxed::Box,
     time::Duration,
 };
 
@@ -48,15 +47,15 @@ use crate::
         },
         gl_object::
         {
-            traits::{GlObject, Bindable},
+            traits::GlObject,
             buffer::Buffer,
-            uniform_buffer::UniformBuffer,
             ArrayBuffer,
             ElementArrayBuffer,
             vertex_array::{AttribPointer, VertexArray},
             texture::{Texture2d, Texture2dParams},
             manager::{GlObjectManager},
         },
+        camera::Camera,
     },
     input::
     {
@@ -66,7 +65,7 @@ use crate::
     },
     math::transform::{Transformation},
 };
-use cgmath::{Matrix4, vec3, Deg, InnerSpace};
+use cgmath::{vec3, Deg};
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -86,20 +85,70 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
+#[allow(dead_code)]
 const TRIANGLE_VERTICESS: [Vertex; 3] =
     [
-        Vertex { pos: [-0.5, -0.5, 0.0], tex: [0.0, 0.0] },
-        Vertex { pos: [ 0.5, -0.5, 0.0], tex: [1.0, 0.0] },
-        Vertex { pos: [ 0.0,  0.5, 0.0], tex: [0.5, 1.0] }
+        Vertex { pos: [-0.5, -0.5, 1.0], tex: [0.0, 0.0] },
+        Vertex { pos: [ 0.5, -0.5, 1.0], tex: [1.0, 0.0] },
+        Vertex { pos: [ 0.0,  0.5, 1.0], tex: [0.5, 1.0] }
     ];
+#[allow(dead_code)]
 const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
+
+const CUBE_VERTICES: [Vertex; 24] =
+    [
+        // Back face
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [0.0/6.0, 1.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [0.0/6.0, 0.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [1.0/6.0, 0.0/6.0] }, /* Bottom Right*/
+
+        // Front face
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [1.0/6.0, 2.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [2.0/6.0, 1.0/6.0] }, /* Bottom Right*/
+
+        // Left face
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [2.0/6.0, 3.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [3.0/6.0, 2.0/6.0] }, /* Bottom Right*/
+
+        // Right face
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [3.0/6.0, 4.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [4.0/6.0, 3.0/6.0] }, /* Bottom Right*/
+
+        // Top face
+        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [4.0/6.0, 5.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [5.0/6.0, 4.0/6.0] }, /* Bottom Right*/
+
+        // Bottom face
+        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [5.0/6.0, 6.0/6.0] }, /* Top Left    */
+        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [6.0/6.0, 6.0/6.0] }, /* Top Right   */
+        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Bottom Left */
+        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [6.0/6.0, 5.0/6.0] }, /* Bottom Right*/
+    ];
+const CUBE_INDICES: [u32; 36] =
+    [
+         1,  0,  2,  2,  3,  1,
+         5,  4,  6,  6,  7,  5,
+         9,  8, 10, 10, 11,  9,
+        13, 12, 14, 14, 15, 13,
+        17, 16, 18, 18, 19, 17,
+        21, 20, 22, 22, 23, 21
+    ];
 
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue>
 {
     // Allow panics to print to javascript console if debug build
     #[cfg(feature="debug")]
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     // Get HTML element references
     let window: Window = window().expect("window context");
@@ -111,6 +160,9 @@ pub fn main() -> Result<(), JsValue>
         };
     let context = new_context(&canvas)?;
 
+    context.enable(Context::CULL_FACE);
+    context.enable(Context::DEPTH_TEST);
+
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
     let mut manager_ref = manager.borrow_mut();
@@ -121,23 +173,18 @@ pub fn main() -> Result<(), JsValue>
         {
             target: Context::TEXTURE_2D,
             format: Context::RGBA,
-            size: (1, 1),
+            size: (1, 6),
             wrap_type: Context::REPEAT,
             filter_type: Context::NEAREST,
-            data: vec![253.0 as u8, 94.0 as u8, 0, 255]
-        }).expect("texture")
-    );
-
-    // Texture for triangle 2
-    let texture_handle_t2 = manager_ref.insert_texture2d(
-        Texture2d::new(&context, Texture2dParams
-        {
-            target: Context::TEXTURE_2D,
-            format: Context::RGBA,
-            size: (1, 1),
-            wrap_type: Context::REPEAT,
-            filter_type: Context::NEAREST,
-            data: vec![30.0 as u8, 144.0 as u8, 255.0 as u8, 255]
+            // data: vec![253.0 as u8, 94.0 as u8, 0, 255]
+            data: vec![
+                128,   0,   0, 255,
+                128,   0, 128, 255,
+                  0, 128, 128, 255,
+                  0,   0, 128, 255,
+                 51, 153, 102, 255,
+                128, 128, 128, 255,
+            ]
         }).expect("texture")
     );
 
@@ -160,13 +207,15 @@ pub fn main() -> Result<(), JsValue>
         ArrayBuffer::bind(&manager_ref, arr_buff_handle);
         {
             let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("array buffer");
-            arr_buff.buffer_data(&TRIANGLE_VERTICESS, Context::STATIC_DRAW);
+            // arr_buff.buffer_data(&TRIANGLE_VERTICESS, Context::STATIC_DRAW);
+            arr_buff.buffer_data(&CUBE_VERTICES, Context::STATIC_DRAW);
         }
         // Setup the element array buffer with the triangle indices
         ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
         {
             let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("element array buffer");
-            elem_arr_buff.buffer_data(&TRIANGLE_INDICES, Context::STATIC_DRAW);
+            //elem_arr_buff.buffer_data(&TRIANGLE_INDICES, Context::STATIC_DRAW);
+            elem_arr_buff.buffer_data(&CUBE_INDICES, Context::STATIC_DRAW);
         }
         // Register the vertex and element array buffers with the VAO
         {
@@ -193,10 +242,6 @@ pub fn main() -> Result<(), JsValue>
     // Wrap the context in an Rc<RefCell<>>
     wrap!(context);
 
-    // Direction of triangle movement
-    let mut dir: f32 = 1.0;
-    // Speed factor of triangle movement
-    let speed: f32 = 0.5;
     // Get javascript performance ref for getting frame time
     let performance = window.performance().expect("performance");
     let mut last_time: Duration = Duration::new(0, 0);
@@ -209,24 +254,72 @@ pub fn main() -> Result<(), JsValue>
     // Setup render information for triangle
     let mut transformation_t1 = Transformation::new();
     let mut transformation_t2 = Transformation::new();
+    transformation_t2.global.scale(vec3(0.5, 0.5, 0.5));
+    transformation_t2.global.translate(vec3(-1.0, 0.0, 0.0));
+    let mut transformation_t3 = Transformation::new();
+    transformation_t3.global.translate(vec3(2.0, 0.0, 0.0));
     let t1 = RenderDto
     {
         tex_handle: texture_handle_t1,
         vert_arr_handle: vert_arr_handle,
-        num_indices: 3
+        num_indices: 36,
     };
-    let t2 = RenderDto
+
+    let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 20.0f32);
+    let camera = Rc::new(RefCell::new(
+        Camera::from_eye(
+            vec3(0.0, 0.0, 0.0),
+            vec3(0.0, 0.0, -1.0),
+            vec3(0.0, 1.0, 0.0)
+        )));
+    camera.borrow_mut().move_cam_locked(vec3(-1.0, 0.0, 6.0));
     {
-        tex_handle: texture_handle_t2,
-        vert_arr_handle: vert_arr_handle,
-        num_indices: 3
-    };
+        clone!(camera);
+        let callback = move |event: web_sys::WheelEvent|
+            {
+                if event.delta_y() > 0.0
+                {
+                    camera.borrow_mut().move_cam_long_locked(0.1);
+                }
+                else if event.delta_y() < 0.0
+                {
+                    camera.borrow_mut().move_cam_long_locked(-0.1);
+                }
+            };
+        let ev = EventListener::new(&canvas, "wheel", callback).expect("zoom event listener");
+        ev.forget();
+    }
+
+    {
+        clone!(camera);
+        let callback = move |event: web_sys::MouseEvent|
+            {
+                if event.buttons() == 1
+                {
+                    borrow_mut!(camera);
+                    if event.movement_x() != 0
+                    {
+                        //camera.move_cam_lat(event.movement_x() as f32 / 800.0);
+                        let delta = if event.movement_x() < 0 { -1.0 } else { 1.0 };
+                        camera.rotate_world_yaw(delta);
+                    }
+                    if event.movement_y() != 0
+                    {
+                        //camera.move_cam_vert(event.movement_y() as f32 / 800.0);
+                        let delta = if event.movement_y() < 0 { -1.0 } else { 1.0 };
+                        camera.rotate_cam_pitch(delta);
+                    }
+                }
+            };
+        let ev = EventListener::new(&canvas, "mousemove", callback).expect("mouse move event listener");
+        ev.forget();
+    }
 
     let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
 
     let render_func =
         {
-            clone!(context, manager);
+            clone!(context, manager, camera);
 
             move ||
                 {
@@ -250,32 +343,9 @@ pub fn main() -> Result<(), JsValue>
                     // Perform any updates skipped due to missed frames
                     while accumulator >= delta_time
                     {
-                        transformation_t1.global.translate(&vec3(speed * dir * delta_time, 0.0, 0.0));
-                        transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
-
-                        transformation_t2.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
-
-                        // Triangle movement bounds
-                        let translation =
-                            {
-                                let mut t = transformation_t1.global.get_translation().clone();
-                                if dir == -1.0
-                                {
-                                    t.x = f32::max(-0.5, t.x);
-                                }
-                                else if dir == 1.0
-                                {
-                                    t.x = f32::min(0.5, t.x);
-                                }
-                                t
-                            };
-
-                        transformation_t1.global.set_translation(translation);
-                        // Reverse triangle direction if out of the bounds
-                        if transformation_t1.translation().x <= -0.5 || transformation_t1.translation().x >= 0.5
-                        {
-                            dir *= -1.0;
-                        }
+                        transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), vec3(0.0, 0.0, 1.0));
+                        transformation_t2.local.rotate_angle_axis(Deg(20.0 * delta_time), vec3(1.0, 1.0, 1.0));
+                        transformation_t3.local.rotate_angle_axis(Deg( 5.0 * delta_time), vec3(1.0, 1.0, 0.0));
 
                         accumulator -= delta_time;
                     }
@@ -284,7 +354,7 @@ pub fn main() -> Result<(), JsValue>
                         borrow!(context);
                         // Reset the render area
                         context.clear_color(0.0, 0.0, 0.0, 1.0);
-                        context.clear(Context::COLOR_BUFFER_BIT);
+                        context.clear(Context::COLOR_BUFFER_BIT | Context::DEPTH_BUFFER_BIT);
 
                         // Setup scene graph
                         let nodes =
@@ -292,29 +362,44 @@ pub fn main() -> Result<(), JsValue>
                                 Node(
                                     &t1,
                                     transformation_t1.matrix(),
+                                    //None
                                     Some(vec![
-                                            Node(
-                                                &t2,
-                                                transformation_t2.matrix(),
-                                                None
-                                            ),
-                                        ])
+                                        Node(
+                                            &t1,
+                                            transformation_t2.matrix(),
+                                            None
+                                        ),
+                                    ])
+                                ),
+                                Node(
+                                    &t1,
+                                    transformation_t3.matrix(),
+                                    None
                                 ),
                             ];
 
-                        renderer.render(&context, &manager.borrow(), &nodes);
+                        renderer.render(&context, &manager.borrow(), perspective * camera.borrow().view_matrix(), &nodes);
                     }
 
                     // Input state tests
-                    let state = input_listener.key_state(Key_a);
-                    if state == InputState::Down
+                    borrow_mut!(camera);
+                    if input_listener.key_state(Key_ArrowLeft) == InputState::Down
                     {
-                        crate::log("Key 'a' is down");
+                        camera.move_cam_lat(0.1);
                     }
-                    else if state == InputState::Repeating
+                    if input_listener.key_state(Key_ArrowRight) == InputState::Down
                     {
-                        crate::log("Key 'a' is repeating");
+                        camera.move_cam_lat(-0.1);
                     }
+                    if input_listener.key_state(Key_ArrowUp) == InputState::Down
+                    {
+                        camera.move_cam_vert(0.1);
+                    }
+                    if input_listener.key_state(Key_ArrowDown) == InputState::Down
+                    {
+                        camera.move_cam_vert(-0.1);
+                    }
+
                 }
         };
 
@@ -322,28 +407,26 @@ pub fn main() -> Result<(), JsValue>
     let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func).expect("render_loop")));
     render_loop.borrow_mut().start().unwrap();
 
-    // Tests for event listener and starting/stopping render loop
     {
-        clone!(context, render_loop);
         let callback = move |event: web_sys::KeyboardEvent|
             {
-                if event.key() == Key_1
+                if event.key() == Key_ArrowUp || event.key() == Key_ArrowDown
+                    || event.key() == Key_ArrowLeft || event.key() == Key_ArrowRight
                 {
-                    render_loop.borrow_mut().start().expect("render loop started");
+                    event.prevent_default();
                 }
-                else if event.key() == Key_2
+                if false
                 {
-                    render_loop.borrow_mut().pause().expect("render loop paused");
-                    borrow!(context);
-                    context.clear_color(0.0, 0.0, 0.0, 1.0);
-                    context.clear(Context::COLOR_BUFFER_BIT);
-                }
-                else if event.key() == Key_3
-                {
-                    render_loop.borrow_mut().cleanup();
+                    render_loop.borrow();
                 }
             };
         let ev = EventListener::new(&canvas, "keydown", callback).expect("event listener registered");
+        ev.forget();
+        let callback = move |event: web_sys::WheelEvent|
+            {
+                event.prevent_default();
+            };
+        let ev = EventListener::new(&canvas, "wheel", callback).expect("event listener registered");
         ev.forget();
     }
 

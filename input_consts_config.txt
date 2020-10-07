@@ -89,10 +89,10 @@ F9
 F10
 F11
 F12
-UpArrow
-LeftArrow
-RightArrow
-DownArrow
+ArrowUp
+ArrowLeft
+ArrowRight
+ArrowDown
 
 Named:
 Space, 
