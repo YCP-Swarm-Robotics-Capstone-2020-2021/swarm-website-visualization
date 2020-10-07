@@ -270,10 +270,10 @@ pub fn main() -> Result<(), JsValue>
     // Setup render information for triangle
     let mut transformation_t1 = Transformation::new();
     let mut transformation_t2 = Transformation::new();
-    transformation_t2.global.scale(&vec3(0.5, 0.5, 0.5));
-    transformation_t2.global.translate(&vec3(-1.0, 0.0, 0.0));
+    transformation_t2.global.scale(vec3(0.5, 0.5, 0.5));
+    transformation_t2.global.translate(vec3(-1.0, 0.0, 0.0));
     let mut transformation_t3 = Transformation::new();
-    transformation_t3.global.translate(&vec3(2.0, 0.0, 0.0));
+    transformation_t3.global.translate(vec3(2.0, 0.0, 0.0));
     let t1 = RenderDto
     {
         tex_handle: texture_handle_t1,
@@ -366,9 +366,9 @@ pub fn main() -> Result<(), JsValue>
                     // Perform any updates skipped due to missed frames
                     while accumulator >= delta_time
                     {
-                        transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), &vec3(0.0, 0.0, 1.0));
-                        transformation_t2.local.rotate_angle_axis(Deg(20.0 * delta_time), &vec3(1.0, 1.0, 1.0));
-                        transformation_t3.local.rotate_angle_axis(Deg( 5.0 * delta_time), &vec3(1.0, 1.0, 0.0));
+                        transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), vec3(0.0, 0.0, 1.0));
+                        transformation_t2.local.rotate_angle_axis(Deg(20.0 * delta_time), vec3(1.0, 1.0, 1.0));
+                        transformation_t3.local.rotate_angle_axis(Deg( 5.0 * delta_time), vec3(1.0, 1.0, 0.0));
 
                         accumulator -= delta_time;
                     }

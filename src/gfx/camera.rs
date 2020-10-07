@@ -275,34 +275,34 @@ impl Camera
     /// Getters
 
     /// Get the camera's base eye position
-    pub fn get_eye_pos(&self) -> Vector3<f32>
+    pub fn get_eye_pos(&self) -> &Vector3<f32>
     {
-        self.eye_pos
+        &self.eye_pos
     }
     
-    pub fn get_looking_at(&self) -> Vector3<f32>
+    pub fn get_looking_at(&self) -> &Vector3<f32>
     {
-        self.looking_at
+        &self.looking_at
     }
 
-    pub fn get_world_up(&self) -> Vector3<f32>
+    pub fn get_world_up(&self) -> &Vector3<f32>
     {
-        self.world_up
+        &self.world_up
     }
 
-    pub fn get_world_forward(&self) -> Vector3<f32>
+    pub fn get_world_forward(&self) -> &Vector3<f32>
     {
-        self.world_forward
+        &self.world_forward
     }
 
-    pub fn get_world_right(&self) -> Vector3<f32>
+    pub fn get_world_right(&self) -> &Vector3<f32>
     {
-        self.world_right
+        &self.world_right
     }
 
-    pub fn get_world_translation(&self) -> Vector3<f32>
+    pub fn get_world_translation(&self) -> &Vector3<f32>
     {
-        self.translation
+        &self.translation
     }
 
     pub fn get_zoomed_eye_pos(&self) -> Vector3<f32>
@@ -328,9 +328,9 @@ impl Camera
         -1.0 * self.translation
     }
 
-    pub fn get_orientation(&self) -> Quaternion<f32>
+    pub fn get_orientation(&self) -> &Quaternion<f32>
     {
-        self.orientation
+        &self.orientation
     }
 
     pub fn get_zoom(&self) -> f32
