@@ -83,7 +83,7 @@ fn log_s(s: String)
 }
 
 #[wasm_bindgen(start)]
-pub fn main() -> Result<(), JsValue>
+pub fn start_visualization() -> Result<(), JsValue>
 {
     #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
