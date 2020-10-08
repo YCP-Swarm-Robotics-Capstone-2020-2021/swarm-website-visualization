@@ -193,3 +193,49 @@ macro_rules! impl_buffer
             }
     };
 }
+
+#[cfg(test)]
+mod tests
+{
+    use wasm_bindgen_test::*;
+    wasm_bindgen_test_configure!(run_in_browser);
+    use wasm_bindgen::
+    {
+        prelude::*,
+        JsCast,
+    };
+    use web_sys::*;
+    use crate::gfx::
+    {
+        Context,
+        gl_object::
+        {
+            traits::Bindable,
+            buffer::Buffer,
+            ArrayBuffer,
+        },
+    };
+
+    fn get_context() -> Context
+    {
+        let window: Window = window().expect("window context");
+        let document: Document = window.document().expect("document context");
+
+        let canvas =
+            {
+                //let elem = document.get_element_by_id("canvas").expect("canvas handle");
+                let elem = document.create_element("CANVAS").expect("new canvas element");
+                elem.set_id("canvas");
+                document.body().expect("document body").append_child(&elem).expect("canvas added to body");
+                elem.dyn_into::<HtmlCanvasElement>().expect("cast canvas element")
+            };
+        crate::gfx::new_context(&canvas).expect("context")
+    }
+
+    #[wasm_bindgen_test]
+    fn test_buffer_contents()
+    {
+        let context = get_context();
+        let buffer = ArrayBuffer::new(&context);
+    }
+}
