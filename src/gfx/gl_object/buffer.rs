@@ -223,7 +223,6 @@ mod tests
 
         let canvas =
             {
-                //let elem = document.get_element_by_id("canvas").expect("canvas handle");
                 let elem = document.create_element("CANVAS").expect("new canvas element");
                 elem.set_id("canvas");
                 document.body().expect("document body").append_child(&elem).expect("canvas added to body");
