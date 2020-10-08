@@ -161,7 +161,7 @@ pub fn main() -> Result<(), JsValue>
 
     {
         let canvas_clone = canvas.clone();
-        let callback = move |event: web_sys::FocusEvent|
+        let callback = move |_event: web_sys::FocusEvent|
             {
                 canvas_clone.request_pointer_lock();
             };
