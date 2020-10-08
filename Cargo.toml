@@ -41,6 +41,7 @@ features = [
     'MouseEvent',
     'WheelEvent',
     'Performance',
+    'FocusEvent',
 
     # WebGL stuff
     'WebGl2RenderingContext',
