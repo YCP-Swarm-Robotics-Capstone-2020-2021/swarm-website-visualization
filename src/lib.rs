@@ -93,6 +93,7 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
+
 fn init() -> Result<(), JsValue>
 {
     let resource_manager = Rc::new(RefCell::new(ResourceManager::new()));
@@ -175,9 +176,9 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
             data: vec![
                 128,   0,   0, 255,
                 128,   0, 128, 255,
-                  0, 128, 128, 255,
-                  0,   0, 128, 255,
-                 51, 153, 102, 255,
+                0, 128, 128, 255,
+                0,   0, 128, 255,
+                51, 153, 102, 255,
                 128, 128, 128, 255,
             ]
         }).expect("texture")
@@ -448,11 +449,10 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
 }
 
 #[wasm_bindgen(start)]
-pub fn main() -> Result<(), JsValue>
+pub fn start_visualization() -> Result<(), JsValue>
 {
-    // Allow panics to print to javascript console if debug build
     #[cfg(feature="debug")]
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     init()?;
 
