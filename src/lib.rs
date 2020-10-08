@@ -158,6 +158,16 @@ pub fn main() -> Result<(), JsValue>
             let elem = document.get_element_by_id("canvas").expect("canvas handle");
             elem.dyn_into::<HtmlCanvasElement>()?
         };
+
+    {
+        let canvas_clone = canvas.clone();
+        let callback = move |_event: web_sys::FocusEvent|
+            {
+                canvas_clone.request_pointer_lock();
+            };
+        let ev = EventListener::new(&canvas, "focus", callback).expect("pointer lock event listener");
+        ev.forget();
+    }
     let context = new_context(&canvas)?;
 
     context.enable(Context::CULL_FACE);
