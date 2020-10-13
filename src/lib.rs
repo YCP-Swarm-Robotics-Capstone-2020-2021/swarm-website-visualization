@@ -161,15 +161,6 @@ pub fn main() -> Result<(), JsValue>
             elem.dyn_into::<HtmlCanvasElement>()?
         };
 
-    {
-        let canvas_clone = canvas.clone();
-        let callback = move |_event: web_sys::FocusEvent|
-            {
-                canvas_clone.request_pointer_lock();
-            };
-        let ev = EventListener::new(&canvas, "focus", callback).expect("pointer lock event listener");
-        ev.forget();
-    }
     let context = new_context(&canvas)?;
 
     context.enable(Context::CULL_FACE);
@@ -304,10 +295,12 @@ pub fn main() -> Result<(), JsValue>
 
     {
         clone!(camera);
+        let canvas_clone = canvas.clone();
         let callback = move |event: web_sys::MouseEvent|
             {
                 if event.buttons() == 1
                 {
+                    canvas_clone.request_pointer_lock();
                     borrow_mut!(camera);
                     if event.movement_x() != 0
                     {
