@@ -235,6 +235,10 @@ mod tests
     fn test_buffer_contents()
     {
         let context = get_context();
-        let buffer = ArrayBuffer::new(&context);
+        let mut buffer = ArrayBuffer::new(&context).expect("array buffer");
+
+        let buff: [u8; 4] = [0, 1, 2, 3];
+        buffer.buffer_data(&buff, Context::STATIC_DRAW);
+
     }
 }
