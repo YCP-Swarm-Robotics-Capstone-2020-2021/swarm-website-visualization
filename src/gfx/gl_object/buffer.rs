@@ -237,8 +237,12 @@ mod tests
         let context = get_context();
         let mut buffer = ArrayBuffer::new(&context).expect("array buffer");
 
-        let buff: [u8; 4] = [0, 1, 2, 3];
+        let mut buff: [u8; 4] = [0, 1, 2, 3];
         buffer.buffer_data(&buff, Context::STATIC_DRAW);
+        assert_eq!(&buffer.buffer, &buff);
 
+        buff[1] = 4;
+        buffer.buffer_sub_data(1, &[4]);
+        assert_eq!(&buffer.buffer, &buff);
     }
 }
