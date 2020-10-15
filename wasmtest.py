@@ -1,4 +1,4 @@
 import os
 
-os.system("wasm-pack test --firefox")
+os.system("wasm-pack test --firefox --chrome --safari")
 
