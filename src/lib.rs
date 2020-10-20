@@ -34,6 +34,7 @@ use crate::
     {
         Context,
         new_context,
+        mesh::{Vertex},
         render_loop::RenderLoop,
         renderer::
         {
@@ -43,7 +44,6 @@ use crate::
                 Node,
                 Renderer,
             },
-            vertex::Vertex,
         },
         gl_object::
         {
