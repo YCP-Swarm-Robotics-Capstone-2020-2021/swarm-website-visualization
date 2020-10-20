@@ -223,3 +223,87 @@ impl Drop for ShaderProgram
         self.context.delete_program(Some(&self.internal));
     }
 }
+
+#[cfg(test)]
+mod tests
+{
+    use wasm_bindgen_test::*;
+    wasm_bindgen_test_configure!(run_in_browser);
+    use wasm_bindgen::
+    {
+        prelude::*,
+        JsCast,
+    };
+    use web_sys::*;
+    use crate::gfx::
+    {
+        Context,
+        GfxError,
+        GlError,
+        gl_get_errors,
+        gl_object::
+        {
+            shader_program::
+                {
+                    ShaderProgram,
+                    shader_source::{BASIC_VERT, BASIC_FRAG}
+                },
+        },
+    };
+
+    fn get_context() -> Context
+    {
+        let window: Window = window().expect("window context");
+        let document: Document = window.document().expect("document context");
+
+        let canvas =
+            {
+                let elem = document.create_element("CANVAS").expect("new canvas element");
+                elem.set_id("canvas");
+                document.body().expect("document body").append_child(&elem).expect("canvas added to body");
+                elem.dyn_into::<HtmlCanvasElement>().expect("cast canvas element")
+            };
+        crate::gfx::new_context(&canvas).expect("context")
+    }
+
+    fn get_shader_program() -> (Context, ShaderProgram)
+    {
+        let context = get_context();
+        let mut shader_program = ShaderProgram::new(
+            &context,
+            Some(BASIC_VERT.to_string()),
+            Some(BASIC_FRAG.to_string())
+        ).expect("shader program");
+        (context, shader_program)
+    }
+
+    #[wasm_bindgen_test]
+    fn test_creation()
+    {
+        let (context, shader_program) = get_shader_program();
+        assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
+    }
+
+    // TODO: Custom test shader so that these tests can pass
+    //       Or would using existing shaders be could so the
+    //       shaders themselves can be tested too?
+    #[wasm_bindgen_test]
+    fn test_block_bindings()
+    {
+        let (context, mut shader_program) = get_shader_program();
+
+        // TODO:
+        //shader_program.add_uniform_block_binding("fake_block", 0).unwrap();
+        //assert_eq!(shader_program.block_bindings[0], Some(String::from("fake_block")))
+    }
+
+    #[wasm_bindgen_test]
+    fn test_set_uniform()
+    {
+        let (context, mut shader_program) = get_shader_program();
+
+        // TODO:
+        //shader_program.set_uniform_i32("fake_uniform", &[0]).unwrap();
+        //assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
+    }
+}
