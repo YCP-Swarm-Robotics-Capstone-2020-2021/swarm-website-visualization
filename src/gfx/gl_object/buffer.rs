@@ -208,6 +208,9 @@ mod tests
     use crate::gfx::
     {
         Context,
+        GfxError,
+        GlError,
+        gl_get_errors,
         gl_object::
         {
             traits::Bindable,
@@ -232,14 +235,19 @@ mod tests
     }
 
     #[wasm_bindgen_test]
-    fn test_buffer_contents()
+    fn test_buffer_data()
     {
         let context = get_context();
         let mut buffer = ArrayBuffer::new(&context).expect("array buffer");
+        assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
 
         let mut buff: [u8; 4] = [0, 1, 2, 3];
         buffer.buffer_data(&buff, Context::STATIC_DRAW);
         assert_eq!(&buff, buffer.buffer.as_slice());
+
+        // TODO: This fails, is it because of the testing environment or
+        //  is there actually a bug somewhere?
+        //assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
 
         buff[1] = 4;
         buffer.buffer_sub_data(1, &[4u8]);
