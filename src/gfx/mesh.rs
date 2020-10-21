@@ -63,14 +63,22 @@ pub struct Mesh
 
 impl Mesh
 {
-    pub fn from_reader<R: io::Read>(reader: R) -> io::Result<Mesh>
+    pub fn from_reader<R: io::Read>(obj_reader: R, mtl_readers: Option<HashMap<String, R>>) -> Result<Mesh, tobj::LoadError>
     {
-        let mut bufreader = io::BufReader::new(reader);
+        let mut bufreader = io::BufReader::new(obj_reader);
         let (models, _materials) = tobj::load_obj_buf(&mut bufreader, true, |p|
             {
-                // TODO: Load materials
-                unimplemented!();
-            }).expect("obj loaded");
+                if let Some(mtl_readers) = &mtl_readers
+                {
+                    let mtl_name = p.to_str().expect("path as str").to_string();
+                    if let Some(mtl_reader) = mtl_readers.remove(&mtl_name)
+                    {
+                        return tobj::load_mtl_buf(&mut io::BufReader::new(mtl_reader));
+                    }
+                }
+
+                return Err(tobj::LoadError::MaterialParseError);
+            })?;
 
         // Keep track of the index associated with each unique vertex
         let mut unique_vertices: HashMap<Vertex, u32, BuildHasherDefault<XxHash32>> = Default::default();
@@ -119,7 +127,7 @@ impl Mesh
                             len
                         }
                         // If it already exists, return the assigned index
-                        else { *unique_vertices.get(&vertex).expect("") }
+                        else { *unique_vertices.get(&vertex).unwrap() }
                     };
                 indices.push(index);
             }
