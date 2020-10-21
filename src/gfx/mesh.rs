@@ -5,9 +5,10 @@ use std::
     collections::HashMap,
 };
 use twox_hash::XxHash32;
+use serde::{Serialize, Deserialize};
 use crate::gfx::GfxError;
 
-#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Vertex
 {
@@ -15,32 +16,28 @@ pub struct Vertex
     pub tex: [f32; 2]
 }
 
-impl Hash for Vertex
-{
-    fn hash<H: Hasher>(&self, state: &mut H)
-    {
-
-    }
-}
-
+#[derive(Debug, Clone)]
 pub struct Mesh
 {
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
 }
 
 impl Mesh
 {
-    pub fn load_stream<R: io::Read>(stream: R) -> io::Result<Mesh>
+    pub fn from_reader<R: io::Read>(reader: R) -> io::Result<Mesh>
     {
-        let mut reader = io::BufReader::new(stream);
-        let (models, _materials) = tobj::load_obj_buf(&reader, true, |p|
+        let mut bufreader = io::BufReader::new(reader);
+        let (models, _materials) = tobj::load_obj_buf(&mut bufreader, true, |p|
             {
                 // TODO: Load materials
                 unimplemented!();
             }).expect("obj loaded");
 
-        let mut unique_vertices: HashMap<Vertex, u32, BuildHasherDefault<XxHash32>> = Default::default();
+        let mut serializer = flexbuffers::FlexbufferSerializer::new();
+
+        // Keep track of the index associated with each unique vertex
+        let mut unique_vertices: HashMap<Vec<u8>, u32, BuildHasherDefault<XxHash32>> = Default::default();
 
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
@@ -50,7 +47,7 @@ impl Mesh
             let mesh = &model.mesh;
             for index in &mesh.indices
             {
-                let index = index as usize;
+                let index = *index as usize;
                 let vertex = Vertex
                 {
                     pos:
@@ -61,21 +58,35 @@ impl Mesh
                     ],
                     tex:
                     [
-                        mesh.texcoords[3 * index],
-                        mesh.texcoords[3 * index + 1],
+                        mesh.texcoords[2 * index],
+                        1.0 - mesh.texcoords[2 * index + 1],
                     ],
                 };
 
+                // Find the index for the vertex
                 let index =
                     {
-                        if !unique_vertices.contains_key(&vertex)
+                        // TODO: Find out a better way to do this
+                        //       A collection of unique vertices needs to be maintained, where the
+                        //       vertex is a key for its index. Floating point values
+                        //       can't/shouldn't be hashed, but there is probably a better way to
+                        //       do this than serializing the structure then hashing it
+
+                        // Serialize the vertex and see if its already within the hashmap of unique vertices
+                        vertex.serialize(&mut serializer).expect("vertex serialized");
+                        let view_vec = serializer.view().to_vec();
+                        if !unique_vertices.contains_key(&view_vec)
                         {
+                            // If it isn't, add it with the current current total # of vertices found
+                            //  as it's index
                             let len = vertices.len() as u32;
-                            unique_vertices.insert(vertex, len);
+                            unique_vertices.insert(view_vec, len);
                             vertices.push(vertex);
                             len as u32
                         }
-                        else { unique_vertices.get(&vertex) }
+                        // If it already exists, return the assigned index
+                        else { *unique_vertices.get(&view_vec)
+                            .expect("key should be presented since contains_key was true to reach here") }
                     };
                 indices.push(index);
             }
