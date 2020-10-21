@@ -225,8 +225,9 @@ pub fn main() -> Result<(), JsValue>
             let mut vert_arr = manager_ref.get_mut_vertex_array(vert_arr_handle).expect("vertex array");
 
             let attribs = vec![
-                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, pos) as i32),
-                AttribPointer::without_defaults(1, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, tex) as i32),
+                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, position) as i32),
+                AttribPointer::without_defaults(1, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, normal) as i32),
+                AttribPointer::without_defaults(2, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, texcoord) as i32),
             ];
             vert_arr.register_array_buffer(arr_buff_handle, Some(attribs));
             vert_arr.register_element_array_buffer(elem_buff_handle, None);
