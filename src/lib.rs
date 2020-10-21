@@ -27,6 +27,7 @@ extern crate memoffset;
 mod gfx;
 mod input;
 mod math;
+mod resource;
 
 use crate::
 {
@@ -64,6 +65,7 @@ use crate::
         states::{InputState, InputStateListener},
     },
     math::transform::{Transformation},
+    resource::loader::ResourceLoader,
 };
 use cgmath::{vec3, Deg};
 

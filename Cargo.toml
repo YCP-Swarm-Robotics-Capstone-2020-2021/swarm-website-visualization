@@ -42,6 +42,7 @@ features = [
     'WheelEvent',
     'Performance',
     'FocusEvent',
+    'FileReader',
 
     # WebGL stuff
     'WebGl2RenderingContext',
