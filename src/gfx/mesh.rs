@@ -5,10 +5,9 @@ use std::
     collections::HashMap,
 };
 use twox_hash::XxHash32;
-use serde::{Serialize, Deserialize};
 use crate::gfx::GfxError;
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone)]
 #[repr(C)]
 pub struct Vertex
 {
@@ -16,6 +15,44 @@ pub struct Vertex
     pub normal: [f32; 3],
     pub texcoord: [f32; 2]
 }
+
+impl Hash for Vertex
+{
+    fn hash<H: Hasher>(&self, state: &mut H)
+    {
+        for f in &self.position
+        {
+            f.to_bits().hash(state);
+        }
+        for f in &self.normal
+        {
+            f.to_bits().hash(state);
+        }
+        for f in &self.texcoord
+        {
+            f.to_bits().hash(state);
+        }
+    }
+}
+
+impl PartialEq for Vertex
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        approx_eq!(f32, self.position[0], other.position[0])    &&
+        approx_eq!(f32, self.position[1], other.position[1])    &&
+        approx_eq!(f32, self.position[2], other.position[2])    &&
+
+        approx_eq!(f32, self.normal[0], other.normal[0])        &&
+        approx_eq!(f32, self.normal[1], other.normal[1])        &&
+        approx_eq!(f32, self.normal[2], other.normal[2])        &&
+
+        approx_eq!(f32, self.texcoord[0], other.texcoord[0])    &&
+        approx_eq!(f32, self.texcoord[1], other.texcoord[1])
+    }
+}
+
+impl Eq for Vertex {}
 
 #[derive(Debug, Clone)]
 pub struct Mesh
@@ -35,10 +72,8 @@ impl Mesh
                 unimplemented!();
             }).expect("obj loaded");
 
-        let mut serializer = flexbuffers::FlexbufferSerializer::new();
-
         // Keep track of the index associated with each unique vertex
-        let mut unique_vertices: HashMap<Vec<u8>, u32, BuildHasherDefault<XxHash32>> = Default::default();
+        let mut unique_vertices: HashMap<Vertex, u32, BuildHasherDefault<XxHash32>> = Default::default();
 
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
@@ -70,30 +105,21 @@ impl Mesh
                     ],
                 };
 
-                // Find the index for the vertex
+                // Get the index for the vertex
                 let index =
                     {
-                        // TODO: Find out a better way to do this
-                        //       A collection of unique vertices needs to be maintained, where the
-                        //       vertex is a key for its index. Floating point values
-                        //       can't/shouldn't be hashed, but there is probably a better way to
-                        //       do this than serializing the structure then hashing it
-
-                        // Serialize the vertex and see if its already within the hashmap of unique vertices
-                        vertex.serialize(&mut serializer).expect("vertex serialized");
-                        let view_vec = serializer.view().to_vec();
-                        if !unique_vertices.contains_key(&view_vec)
+                        // See if the vertex is already within the hashmap of unique vertices
+                        if !unique_vertices.contains_key(&vertex)
                         {
                             // If it isn't, add it with the current current total # of vertices found
-                            //  as it's index
+                            //  as its index
                             let len = vertices.len() as u32;
-                            unique_vertices.insert(view_vec, len);
+                            unique_vertices.insert(vertex, len);
                             vertices.push(vertex);
-                            len as u32
+                            len
                         }
                         // If it already exists, return the assigned index
-                        else { *unique_vertices.get(&view_vec)
-                            .expect("key should be presented since contains_key was true to reach here") }
+                        else { *unique_vertices.get(&vertex).expect("") }
                     };
                 indices.push(index);
             }
