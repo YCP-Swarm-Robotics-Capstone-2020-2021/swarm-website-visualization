@@ -23,6 +23,8 @@ use std::
 mod redeclare;
 #[macro_use]
 extern crate memoffset;
+#[macro_use]
+extern crate serde_derive;
 
 mod gfx;
 mod input;
@@ -34,7 +36,7 @@ use crate::
     {
         Context,
         new_context,
-        mesh::{Vertex},
+        mesh::{Vertex, Mesh},
         render_loop::RenderLoop,
         renderer::
         {
@@ -85,63 +87,51 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
-#[allow(dead_code)]
-const TRIANGLE_VERTICESS: [Vertex; 3] =
-    [
-        Vertex { pos: [-0.5, -0.5, 1.0], tex: [0.0, 0.0] },
-        Vertex { pos: [ 0.5, -0.5, 1.0], tex: [1.0, 0.0] },
-        Vertex { pos: [ 0.0,  0.5, 1.0], tex: [0.5, 1.0] }
-    ];
-#[allow(dead_code)]
-const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
-
-const CUBE_VERTICES: [Vertex; 24] =
-    [
-        // Back face
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [0.0/6.0, 1.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [0.0/6.0, 0.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [1.0/6.0, 0.0/6.0] }, /* Bottom Right*/
-
-        // Front face
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [1.0/6.0, 2.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [2.0/6.0, 1.0/6.0] }, /* Bottom Right*/
-
-        // Left face
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [2.0/6.0, 3.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [3.0/6.0, 2.0/6.0] }, /* Bottom Right*/
-
-        // Right face
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [3.0/6.0, 4.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [4.0/6.0, 3.0/6.0] }, /* Bottom Right*/
-
-        // Top face
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [4.0/6.0, 5.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [5.0/6.0, 4.0/6.0] }, /* Bottom Right*/
-
-        // Bottom face
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [5.0/6.0, 6.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [6.0/6.0, 6.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [6.0/6.0, 5.0/6.0] }, /* Bottom Right*/
-    ];
-const CUBE_INDICES: [u32; 36] =
-    [
-         1,  0,  2,  2,  3,  1,
-         5,  4,  6,  6,  7,  5,
-         9,  8, 10, 10, 11,  9,
-        13, 12, 14, 14, 15, 13,
-        17, 16, 18, 18, 19, 17,
-        21, 20, 22, 22, 23, 21
-    ];
+const CUBE_WAVEFRONT: &'static str = "# Blender v2.80 (sub 75) OBJ File: ''
+# www.blender.org
+o Cube
+v 0.5 0.5 -0.5
+v 0.5 -0.5 -0.5
+v 0.5 0.5 0.5
+v 0.5 -0.5 0.5
+v -0.5 0.5 -0.5
+v -0.5 -0.5 -0.5
+v -0.5 0.5 0.5
+v -0.5 -0.5 0.5
+vt 0.375000 0.000000
+vt 0.625000 0.000000
+vt 0.625000 0.250000
+vt 0.375000 0.250000
+vt 0.375000 0.250000
+vt 0.625000 0.250000
+vt 0.625000 0.500000
+vt 0.375000 0.500000
+vt 0.625000 0.750000
+vt 0.375000 0.750000
+vt 0.625000 0.750000
+vt 0.625000 0.5
+vt 0.375000 0.5
+vt 0.125000 0.500000
+vt 0.375000 0.500000
+vt 0.375000 0.750000
+vt 0.125000 0.750000
+vt 0.625000 0.500000
+vt 0.875000 0.500000
+vt 0.875000 0.750000
+vn 0.0000 1.0000 0.0000
+vn 0.0000 0.0000 1.0000
+vn -1.0000 0.0000 0.0000
+vn 0.0000 -1.0000 0.0000
+vn 1.0000 0.0000 0.0000
+vn 0.0000 0.0000 -1.0000
+s off
+f 1/1/1 5/2/1 7/3/1 3/4/1
+f 4/5/2 3/6/2 7/7/2 8/8/2
+f 8/8/3 7/7/3 5/9/3 6/10/3
+f 6/10/4 2/11/4 4/12/4 8/13/4
+f 2/14/5 1/15/5 3/16/5 4/17/5
+f 6/18/6 5/19/6 1/20/6 2/11/6
+";
 
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue>
@@ -172,6 +162,9 @@ pub fn main() -> Result<(), JsValue>
 
     context.enable(Context::CULL_FACE);
     context.enable(Context::DEPTH_TEST);
+
+    let mesh = Mesh::from_reader(String::from(CUBE_WAVEFRONT).as_bytes()).expect("mesh");
+    //crate::log_s(format!("{:?}", mesh));
 
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
@@ -217,15 +210,15 @@ pub fn main() -> Result<(), JsValue>
         ArrayBuffer::bind(&manager_ref, arr_buff_handle);
         {
             let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("array buffer");
-            // arr_buff.buffer_data(&TRIANGLE_VERTICESS, Context::STATIC_DRAW);
-            arr_buff.buffer_data(&CUBE_VERTICES, Context::STATIC_DRAW);
+            // arr_buff.buffer_data(&CUBE_VERTICES, Context::STATIC_DRAW);
+            arr_buff.buffer_data(&mesh.vertices, Context::STATIC_DRAW);
         }
         // Setup the element array buffer with the triangle indices
         ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
         {
             let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("element array buffer");
-            //elem_arr_buff.buffer_data(&TRIANGLE_INDICES, Context::STATIC_DRAW);
-            elem_arr_buff.buffer_data(&CUBE_INDICES, Context::STATIC_DRAW);
+            // elem_arr_buff.buffer_data(&CUBE_INDICES, Context::STATIC_DRAW);
+            elem_arr_buff.buffer_data(&mesh.indices, Context::STATIC_DRAW);
         }
         // Register the vertex and element array buffers with the VAO
         {
