@@ -12,8 +12,9 @@ use crate::gfx::GfxError;
 #[repr(C)]
 pub struct Vertex
 {
-    pub pos: [f32; 3],
-    pub tex: [f32; 2]
+    pub position: [f32; 3],
+    pub normal: [f32; 3],
+    pub texcoord: [f32; 2]
 }
 
 #[derive(Debug, Clone)]
@@ -50,13 +51,19 @@ impl Mesh
                 let index = *index as usize;
                 let vertex = Vertex
                 {
-                    pos:
+                    position:
                     [
                         mesh.positions[3 * index],
                         mesh.positions[3 * index + 1],
                         mesh.positions[3 * index + 2],
                     ],
-                    tex:
+                    normal:
+                    [
+                        mesh.normals[3 * index],
+                        mesh.normals[3 * index + 1],
+                        mesh.normals[3 * index + 2],
+                    ],
+                    texcoord:
                     [
                         mesh.texcoords[2 * index],
                         1.0 - mesh.texcoords[2 * index + 1],
