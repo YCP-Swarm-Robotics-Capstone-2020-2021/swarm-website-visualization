@@ -400,6 +400,9 @@ pub fn main() -> Result<(), JsValue>
         ev.forget();
     }
 
+    let r = ResourceLoader::new();
+    r.submit();
+
     Ok(())
 }
 
