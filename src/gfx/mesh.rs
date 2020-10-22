@@ -63,22 +63,39 @@ pub struct Mesh
 
 impl Mesh
 {
-    pub fn from_reader<R: io::Read>(obj_reader: R, mtl_readers: Option<HashMap<String, R>>) -> Result<Mesh, tobj::LoadError>
+    /// Loads mesh from reader for an OBJ file and its materials
+    ///
+    /// `obj_reader` is the reader for the OBJ file
+    /// `mtl_readers` is a vec of (material file name, material file reader)
+    ///     Pass an empty vec if no materials are present in the OBJ file.
+    ///     Note that if a material file is specified in the OBJ file but not
+    ///     present in `mtl_readers`, then an error will be thrown
+    pub fn from_reader<R: io::Read>(obj_reader: R, mtl_readers: Vec<(String, R)>) -> Result<Mesh, tobj::LoadError>
     {
-        let mut bufreader = io::BufReader::new(obj_reader);
-        let (models, _materials) = tobj::load_obj_buf(&mut bufreader, true, |p|
-            {
-                if let Some(mtl_readers) = &mtl_readers
-                {
-                    let mtl_name = p.to_str().expect("path as str").to_string();
-                    if let Some(mtl_reader) = mtl_readers.remove(&mtl_name)
-                    {
-                        return tobj::load_mtl_buf(&mut io::BufReader::new(mtl_reader));
-                    }
-                }
+        // Load all materials
+        // This hashmap gets dropped after its shadowed by the material vec from
+        // `load_obj_buf`, but that's intended behaviour since this information is unneeded
+        // after the OBJ file is loaded
+        let mut materials: HashMap<String, tobj::MTLLoadResult, BuildHasherDefault<XxHash32>> = Default::default();
+        for (name, reader) in mtl_readers
+        {
+            let mut bufreader = io::BufReader::new(reader);
+            materials.insert(name, tobj::load_mtl_buf(&mut bufreader));
+        }
 
-                return Err(tobj::LoadError::MaterialParseError);
+        // Load OBJ and associate with materials
+        let mut bufreader = io::BufReader::new(obj_reader);
+        let (models, materials) = tobj::load_obj_buf(&mut bufreader, true, |p|
+            {
+                // Get the already loaded material
+                let mtl_name = p.to_str().expect("path as str").to_string();
+                match materials.get(&mtl_name)
+                {
+                    Some(mtl_load_result) => mtl_load_result.clone(),
+                    None => Err(tobj::LoadError::MaterialParseError)
+                }
             })?;
+
 
         // Keep track of the index associated with each unique vertex
         let mut unique_vertices: HashMap<Vertex, u32, BuildHasherDefault<XxHash32>> = Default::default();
