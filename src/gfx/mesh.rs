@@ -54,7 +54,7 @@ impl PartialEq for Vertex
 
 impl Eq for Vertex {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Mesh
 {
     pub vertices: Vec<Vertex>,
