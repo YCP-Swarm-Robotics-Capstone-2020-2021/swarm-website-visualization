@@ -112,7 +112,7 @@ pub fn main() -> Result<(), JsValue>
     context.enable(Context::CULL_FACE);
     context.enable(Context::DEPTH_TEST);
 
-    let mesh = Mesh::from_reader(String::from(CUBE_WAVEFRONT).as_bytes(), None).expect("cube");
+    let mesh = Mesh::from_reader(String::from(CUBE_WAVEFRONT).as_bytes(), vec![]).expect("cube");
 
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
