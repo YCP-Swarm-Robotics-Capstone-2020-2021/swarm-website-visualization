@@ -144,6 +144,7 @@ pub fn new_context(canvas: &web_sys::HtmlCanvasElement) -> Result<Context, &'sta
 }
 
 pub mod gl_object;
+pub mod mesh;
 pub mod render_loop;
 pub mod renderer;
 pub mod camera;

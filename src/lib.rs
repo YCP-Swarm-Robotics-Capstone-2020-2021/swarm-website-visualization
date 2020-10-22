@@ -23,6 +23,8 @@ use std::
 mod redeclare;
 #[macro_use]
 extern crate memoffset;
+#[macro_use]
+extern crate float_cmp;
 
 mod gfx;
 mod input;
@@ -34,6 +36,7 @@ use crate::
     {
         Context,
         new_context,
+        mesh::{Vertex, Mesh},
         render_loop::RenderLoop,
         renderer::
         {
@@ -43,7 +46,6 @@ use crate::
                 Node,
                 Renderer,
             },
-            vertex::Vertex,
         },
         gl_object::
         {
@@ -85,63 +87,7 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
-#[allow(dead_code)]
-const TRIANGLE_VERTICESS: [Vertex; 3] =
-    [
-        Vertex { pos: [-0.5, -0.5, 1.0], tex: [0.0, 0.0] },
-        Vertex { pos: [ 0.5, -0.5, 1.0], tex: [1.0, 0.0] },
-        Vertex { pos: [ 0.0,  0.5, 1.0], tex: [0.5, 1.0] }
-    ];
-#[allow(dead_code)]
-const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
-
-const CUBE_VERTICES: [Vertex; 24] =
-    [
-        // Back face
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [0.0/6.0, 1.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [0.0/6.0, 0.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [1.0/6.0, 0.0/6.0] }, /* Bottom Right*/
-
-        // Front face
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [1.0/6.0, 2.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [2.0/6.0, 1.0/6.0] }, /* Bottom Right*/
-
-        // Left face
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [2.0/6.0, 3.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [3.0/6.0, 2.0/6.0] }, /* Bottom Right*/
-
-        // Right face
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [3.0/6.0, 4.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [4.0/6.0, 3.0/6.0] }, /* Bottom Right*/
-
-        // Top face
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [4.0/6.0, 5.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [5.0/6.0, 4.0/6.0] }, /* Bottom Right*/
-
-        // Bottom face
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [5.0/6.0, 6.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [6.0/6.0, 6.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [6.0/6.0, 5.0/6.0] }, /* Bottom Right*/
-    ];
-const CUBE_INDICES: [u32; 36] =
-    [
-         1,  0,  2,  2,  3,  1,
-         5,  4,  6,  6,  7,  5,
-         9,  8, 10, 10, 11,  9,
-        13, 12, 14, 14, 15, 13,
-        17, 16, 18, 18, 19, 17,
-        21, 20, 22, 22, 23, 21
-    ];
+const CUBE_WAVEFRONT: &'static str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cube.obj"));
 
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue>
@@ -164,11 +110,13 @@ pub fn main() -> Result<(), JsValue>
     context.enable(Context::CULL_FACE);
     context.enable(Context::DEPTH_TEST);
 
+    let mesh = Mesh::from_reader(String::from(CUBE_WAVEFRONT).as_bytes()).expect("cube");
+
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
     let mut manager_ref = manager.borrow_mut();
 
-    // Texture for triangle 1
+    // Texture for cubes
     let texture_handle_t1 = manager_ref.insert_texture2d(
         Texture2d::new(&context, Texture2dParams
         {
@@ -204,27 +152,28 @@ pub fn main() -> Result<(), JsValue>
 
     {
         VertexArray::bind(&manager_ref, vert_arr_handle);
-        // Setup the vertex array buffer with the triangle vertices
+        // Setup the vertex array buffer with the cube vertices
         ArrayBuffer::bind(&manager_ref, arr_buff_handle);
         {
             let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("array buffer");
-            // arr_buff.buffer_data(&TRIANGLE_VERTICESS, Context::STATIC_DRAW);
-            arr_buff.buffer_data(&CUBE_VERTICES, Context::STATIC_DRAW);
+            // arr_buff.buffer_data(&CUBE_VERTICES, Context::STATIC_DRAW);
+            arr_buff.buffer_data(&mesh.vertices, Context::STATIC_DRAW);
         }
-        // Setup the element array buffer with the triangle indices
+        // Setup the element array buffer with the cube indices
         ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
         {
             let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("element array buffer");
-            //elem_arr_buff.buffer_data(&TRIANGLE_INDICES, Context::STATIC_DRAW);
-            elem_arr_buff.buffer_data(&CUBE_INDICES, Context::STATIC_DRAW);
+            // elem_arr_buff.buffer_data(&CUBE_INDICES, Context::STATIC_DRAW);
+            elem_arr_buff.buffer_data(&mesh.indices, Context::STATIC_DRAW);
         }
         // Register the vertex and element array buffers with the VAO
         {
             let mut vert_arr = manager_ref.get_mut_vertex_array(vert_arr_handle).expect("vertex array");
 
             let attribs = vec![
-                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, pos) as i32),
-                AttribPointer::without_defaults(1, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, tex) as i32),
+                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, position) as i32),
+                AttribPointer::without_defaults(1, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, normal) as i32),
+                AttribPointer::without_defaults(2, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, texcoord) as i32),
             ];
             vert_arr.register_array_buffer(arr_buff_handle, Some(attribs));
             vert_arr.register_element_array_buffer(elem_buff_handle, None);
@@ -252,18 +201,20 @@ pub fn main() -> Result<(), JsValue>
 
     let renderer = Renderer::new(&context.borrow(), &mut manager.borrow_mut()).expect("renderer");
 
-    // Setup render information for triangle
+    // Setup render information for cube
     let mut transformation_t1 = Transformation::new();
+    transformation_t1.global.scale(vec3(0.5, 0.5, 0.5));
     let mut transformation_t2 = Transformation::new();
     transformation_t2.global.scale(vec3(0.5, 0.5, 0.5));
-    transformation_t2.global.translate(vec3(-1.0, 0.0, 0.0));
+    transformation_t2.global.translate(vec3(-2.0, 0.0, 0.0));
     let mut transformation_t3 = Transformation::new();
+    transformation_t3.global.scale(vec3(0.5, 0.5, 0.5));
     transformation_t3.global.translate(vec3(2.0, 0.0, 0.0));
     let t1 = RenderDto
     {
         tex_handle: texture_handle_t1,
         vert_arr_handle: vert_arr_handle,
-        num_indices: 36,
+        num_indices: mesh.indices.len() as i32,
     };
 
     let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 20.0f32);
