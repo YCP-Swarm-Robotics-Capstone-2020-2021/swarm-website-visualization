@@ -26,7 +26,7 @@ impl ResourceManager
 
     pub fn insert(&mut self, resource: Vec<u8>) -> ResourceHandle
     {
-        self.resources.insert(resource);
+        self.resources.insert(resource)
     }
 
     pub fn insert_with_name(&mut self, name: String, resource: Vec<u8>) -> ResourceHandle
@@ -54,7 +54,7 @@ impl ResourceManager
 
     pub fn remove_by_name(&mut self, name: &String) -> Option<Vec<u8>>
     {
-        let handle = *self.handle_map.remove(name);
+        let handle = self.handle_map.remove(name)?;
         self.remove(handle)
     }
 }
