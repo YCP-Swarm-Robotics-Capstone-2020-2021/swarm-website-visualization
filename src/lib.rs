@@ -67,7 +67,7 @@ use crate::
         states::{InputState, InputStateListener},
     },
     math::transform::{Transformation},
-    resource::loader::ResourceLoader,
+    resource::loader::{ResourceLoader},
 };
 use cgmath::{vec3, Deg};
 
@@ -400,8 +400,51 @@ pub fn main() -> Result<(), JsValue>
         ev.forget();
     }
 
-    let r = ResourceLoader::new();
-    r.submit();
+    let mut resource_loader = ResourceLoader::new();
+    resource_loader.set_onloadend(move ||
+        {
+            crate::log("all requests done");
+        });
+
+    let request_handle = resource_loader.add_request("GET", "/test_resource.txt")?;
+    resource_loader.set_request_onerror(request_handle, move |_request: web_sys::XmlHttpRequest, _event: web_sys::ProgressEvent|
+        {
+            crate::log("request1 error");
+        });
+    resource_loader.set_request_onloadstart(request_handle, move |_request: web_sys::XmlHttpRequest, _event: web_sys::ProgressEvent|
+        {
+           crate::log("request1 started");
+        });
+    resource_loader.set_request_onloadend(request_handle, move |request: web_sys::XmlHttpRequest, _event: web_sys::ProgressEvent|
+        {
+            crate::log("request1 done");
+            crate::log_s(format!("{}", request.response_text().unwrap().unwrap()));
+        });
+    resource_loader.set_request_onprogress(request_handle, move |event: web_sys::ProgressEvent|
+        {
+            crate::log_s(format!("request1 {} - {}", event.total(), event.loaded()))
+        });
+
+    let request_handle = resource_loader.add_request("GET", "/test_resource.txt")?;
+    resource_loader.set_request_onerror(request_handle, move |_request: web_sys::XmlHttpRequest, _event: web_sys::ProgressEvent|
+        {
+            crate::log("request2 error");
+        });
+    resource_loader.set_request_onloadstart(request_handle, move |_request: web_sys::XmlHttpRequest, _event: web_sys::ProgressEvent|
+        {
+            crate::log("request2 started");
+        });
+    resource_loader.set_request_onloadend(request_handle, move |request: web_sys::XmlHttpRequest, _event: web_sys::ProgressEvent|
+        {
+            crate::log("request2 done");
+            crate::log_s(format!("{}", request.response_text().unwrap().unwrap()));
+        });
+    resource_loader.set_request_onprogress(request_handle, move |event: web_sys::ProgressEvent|
+        {
+            crate::log_s(format!("request2 {} - {}", event.total(), event.loaded()))
+        });
+
+    resource_loader.submit();
 
     Ok(())
 }

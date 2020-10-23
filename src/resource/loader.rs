@@ -15,10 +15,13 @@ use std::
 };
 
 type RequestClosure = Closure<dyn FnMut(ProgressEvent)>;
+pub type RequestHandle = usize;
 struct HttpRequest
 {
     // Handle
-    http_request: XmlHttpRequest,
+    internal: XmlHttpRequest,
+    method: String,
+    url: String,
     // Events
     onabort: Option<RequestClosure>,
     onerror: Option<RequestClosure>,
@@ -27,18 +30,38 @@ struct HttpRequest
     onloadend: Option<RequestClosure>,
     onprogress: Option<RequestClosure>,
 }
+impl HttpRequest
+{
+    fn new(method: String, url: String) -> Result<HttpRequest, JsValue>
+    {
+        Ok(HttpRequest
+        {
+            internal: XmlHttpRequest::new()?,
+            method, url,
+            onabort: None, onerror: None,
+            onload: None, onloadstart: None, onloadend: None, onprogress: None
+        })
+    }
+}
+impl Drop for HttpRequest
+{
+    fn drop(&mut self)
+    {
+        crate::log("http request dropped");
+    }
+}
 
 pub struct ResourceLoader
 {
     cb: Option<Closure<dyn FnMut(JsValue)>>,
 
-    requests_left: Rc<Cell<i32>>,
+    requests_left: Cell<i32>,
     // Total work that is already done
-    work_total: Rc<Cell<f64>>,
+    work_total: Cell<f64>,
     // Total work to be done across all resources
-    work_loaded: Rc<Cell<f64>>,
-    global_onloadend: Rc<Cell<Option<Box<dyn FnOnce()>>>>,
-    global_onprogress: Rc<RefCell<Option<Box<dyn FnMut(f64, f64)>>>>,
+    work_loaded: Cell<f64>,
+    global_onloadend: Cell<Option<Box<dyn FnOnce()>>>,
+    global_onprogress: Option<Box<dyn FnMut(f64, f64)>>,
     http_requests: Vec<HttpRequest>,
 }
 
@@ -50,11 +73,11 @@ impl ResourceLoader
         ResourceLoader
         {
             cb: None,
-            requests_left: Rc::new(Cell::new(0)),
-            work_total: Rc::new(Cell::new(0.0)),
-            work_loaded: Rc::new(Cell::new(0.0)),
-            global_onloadend: Rc::new(Cell::new(None)),
-            global_onprogress: Rc::new(RefCell::new(None)),
+            requests_left: Cell::new(0),
+            work_total: Cell::new(0.0),
+            work_loaded: Cell::new(0.0),
+            global_onloadend: Cell::new(None),
+            global_onprogress: None,
             http_requests: vec![],
         }
     }
@@ -71,151 +94,211 @@ impl ResourceLoader
     pub fn set_onprogress<F>(&mut self, mut callback: F) where F: 'static + FnMut(f64, f64)
     {
         //self.onprogress = Some(Closure::wrap(Box::new(callback) as Box<dyn FnMut(_, _)>));
-        *self.global_onprogress.borrow_mut() = Some(Box::new(callback));
+        self.global_onprogress = Some(Box::new(callback));
     }
-    /// Add a resource to be loaded
-    pub fn add_resource<FO, FM>(&mut self,
-                            resource_url: &str,
-                            mut onabort: Option<FO>,
-                            mut onerror: Option<FO>,
-                            mut onload: Option<FO>,
-                            mut onloadstart: Option<FO>,
-                            mut onloadend: Option<FO>,
-                            mut onprogress: Option<FM>
-    ) -> Result<(), JsValue> where FO: 'static + FnOnce(XmlHttpRequest, ProgressEvent), FM: 'static + FnMut(ProgressEvent)
+
+    pub fn add_request(&mut self, method: impl Into<String>, url: impl Into<String>) -> Result<RequestHandle, JsValue>
     {
-        // Increment the counter of the number of requests being made
-        let left = self.requests_left.get();
-        self.requests_left.set(left + 1);
+        self.http_requests.push(HttpRequest::new(method.into(), url.into())?);
+        self.requests_left.set(self.requests_left.get() + 1);
+        Ok(self.http_requests.len()-1)
+    }
 
-        // Initialize all callbacks to None
-        let mut request = HttpRequest
+    pub fn set_request_onabort<F>(&mut self, handle: RequestHandle, mut onabort: F)
+        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    {
+        if let Some(http_request) = self.http_requests.get_mut(handle)
         {
-            http_request: XmlHttpRequest::new()?,
-            onabort: None, onerror: None,
-            onload: None, onloadstart: None, onloadend: None,
-            onprogress: None,
-        };
-
-        // Setup onabort callback
-        if let Some(mut onabort) = onabort
-        {
-            clone!(request.http_request);
+            clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    onabort(http_request, event);
+                    onabort(internal, event);
                 });
-            request.onabort = Some(closure);
-        }
+            http_request.onabort = Some(closure);
+            http_request.internal.set_onabort(Some(http_request.onabort.as_ref().unwrap().as_ref().unchecked_ref()));
 
-        // Setup onerror callback
-        if let Some(mut onerror) = onerror
+            true
+        }
+        else { false }
+    }
+
+    pub fn set_request_onerror<F>(&mut self, handle: RequestHandle, mut onerror: F)
+        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    {
+        if let Some(http_request) = self.http_requests.get_mut(handle)
         {
-            clone!(request.http_request);
+            clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    onerror(http_request, event);
+                    onerror(internal, event);
                 });
-            request.onerror = Some(closure);
-        }
+            http_request.onerror = Some(closure);
+            http_request.internal.set_onerror(Some(http_request.onerror.as_ref().unwrap().as_ref().unchecked_ref()));
 
-        // Setup onload callback
-        if let Some(mut onload) = onload
+            true
+        }
+        else { false }
+    }
+
+    pub fn set_request_onload<F>(&mut self, handle: RequestHandle, mut onload: F)
+        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    {
+        if let Some(http_request) = self.http_requests.get_mut(handle)
         {
-            clone!(request.http_request);
+            clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    onload(http_request, event);
+                    onload(internal, event);
                 });
-            request.onload = Some(closure);
-        }
+            http_request.onload = Some(closure);
+            http_request.internal.set_onload(Some(http_request.onload.as_ref().unwrap().as_ref().unchecked_ref()));
 
-        // Setup onloadstart callback
-        if let Some(mut onloadstart) = onloadstart
+            true
+        }
+        else { false }
+    }
+
+    pub fn set_request_onloadstart<F>(&mut self, handle: RequestHandle, mut onloadstart: F)
+        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    {
+        if let Some(http_request) = self.http_requests.get_mut(handle)
         {
-            clone!(request.http_request, self.work_total);
+            clone!(http_request.internal, self.work_total);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
                     if event.length_computable()
                     {
                         work_total.set(work_total.get() + event.total());
                     }
-                    onloadstart(http_request, event);
+                    onloadstart(internal, event);
                 });
-            request.onloadstart = Some(closure);
-        }
+            http_request.onloadstart = Some(closure);
+            http_request.internal.set_onloadstart(Some(http_request.onloadstart.as_ref().unwrap().as_ref().unchecked_ref()));
 
-        // Setup onloadend callback
-        //  This is also where the overall "when everything is done" callback trigger is setup
-        if let Some(mut onloadend) = onloadend
+            true
+        }
+        else { false }
+    }
+
+    //  This is also where the overall "when everything is done" callback trigger is setup
+    pub fn set_request_onloadend<F>(&mut self, handle: RequestHandle, mut onloadend: F)
+        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    {
+        if let Some(http_request) = self.http_requests.get_mut(handle)
         {
-            clone!(request.http_request, self.global_onloadend);
-            let requests_left = self.requests_left.clone();
+            clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    let left = requests_left.get();
-                    if left <= 1
-                    {
-                        // TODO: cleanup/drop all memory here
-                        if let Some(mut global_onloadend) = global_onloadend.take()
-                        {
-                            global_onloadend();
-                        }
-                    }
-                    else
-                    {
-                        requests_left.set(left - 1);
-                        onloadend(http_request, event);
-                    }
+                    onloadend(internal, event);
                 });
-            request.onloadend = Some(closure);
-        }
+            http_request.onloadend = Some(closure);
+            http_request.internal.set_onloadend(Some(http_request.onloadend.as_ref().unwrap().as_ref().unchecked_ref()));
 
-        if let Some(mut onprogress) = onprogress
+            true
+        }
+        else { false }
+    }
+
+    pub fn set_request_onprogress<F>(&mut self, handle: RequestHandle, mut onprogress: F)
+        -> bool where F: 'static + FnMut(ProgressEvent)
+    {
+        if let Some(http_request) = self.http_requests.get_mut(handle)
         {
-            clone!(self.global_onprogress, self.work_loaded, self.work_total);
             let closure = Closure::wrap(Box::new(move |event: ProgressEvent|
                 {
-                    if let Some(global_onprogress) = global_onprogress.borrow_mut().as_mut()
-                    {
-                        if event.length_computable()
-                        {
-                            let loaded = work_loaded.get() + event.loaded();
-                            work_loaded.set(loaded);
-                            global_onprogress(loaded, work_total.get());
-                        }
-                    }
-
                     onprogress(event);
                 }) as Box<dyn FnMut(_)>);
-            request.onprogress = Some(closure);
-        }
+            http_request.onprogress = Some(closure);
+            http_request.internal.set_onprogress(Some(http_request.onprogress.as_ref().unwrap().as_ref().unchecked_ref()));
 
-        self.http_requests.push(request);
-        Ok(())
+            true
+        }
+        else { false }
     }
 
+    /// Add a resource to be loaded
+    // TODO: Return error(s)
     pub fn submit(self)
     {
+        let mut loader = self;
+        let mut http_requests = vec![];
+        std::mem::swap(&mut loader.http_requests, &mut http_requests);
+        let mut loader = Rc::new(RefCell::new(loader));
 
-    }
-
-/*    pub fn submit(self)
-    {
-        let rl = std::rc::Rc::new(std::cell::RefCell::new(self));
-        let rl_c = rl.clone();
-        let closure = Closure::wrap(Box::new(move |_event: JsValue|
-            {
+        for http_request in &mut http_requests
+        {
+            let closure =
                 {
-                    rl_c.borrow_mut().cb.take();
-                    // std::mem::drop(rl_c.borrow_mut().cb.take());
-                }
-                crate::log("timeout");
-            }) as Box<dyn FnMut(_)>);
-        rl.borrow_mut().cb = Some(closure);
-        web_sys::window().unwrap().set_timeout_with_callback_and_timeout_and_arguments_0(rl.borrow().cb.as_ref().unwrap().as_ref().unchecked_ref(), 2000);
-        std::mem::drop(rl);
-    }*/
+                    let onloadend = http_request.onloadend.take();
+                    clone!(loader);
+                    Closure::once(move |event: ProgressEvent|
+                        {
+                            if let Some(mut onloadend) = onloadend
+                            {
+                                // TODO: Error checking instead of calling unwrap()
+                                onloadend.into_js_value().dyn_into::<js_sys::Function>().unwrap().call1(&JsValue::null(), &event).expect("function call");
+                            }
+
+                            let loader_borrow = loader.borrow();
+                            let left = loader_borrow.requests_left.get();
+                            loader_borrow.requests_left.set(left - 1);
+
+                            if left <= 1
+                            {
+                                if let Some(mut global_onloadend) = loader_borrow.global_onloadend.take()
+                                {
+                                    global_onloadend();
+                                }
+                            }
+                        })
+                };
+            http_request.onloadend = Some(closure);
+            http_request.internal.set_onloadend(Some(http_request.onloadend.as_ref().unwrap().as_ref().unchecked_ref()));
+
+            let closure =
+                {
+                    let onprogress = http_request.onprogress.take();
+
+                    let onprogress = if let Some(closure) = onprogress
+                    {
+                        Some(closure.into_js_value().dyn_into::<js_sys::Function>().unwrap())
+                    }
+                    else { None };
+                    let onprogress = Rc::new(RefCell::new(onprogress));
+                    let loader = Rc::downgrade(&loader);
+                    clone!(onprogress);
+                    Closure::wrap(Box::new(move |event: ProgressEvent|
+                        {
+                            if let Some(mut onprogress) = onprogress.borrow_mut().as_mut()
+                            {
+                                // TODO: Error checking instead of calling unwrap()
+                                onprogress.call1(&JsValue::null(), &event).expect("function call");
+                            }
+
+                            if event.length_computable()
+                            {
+                                if let Some(loader) = loader.upgrade()
+                                {
+                                    borrow_mut!(loader);
+                                    let loaded = loader.work_loaded.get() + event.loaded();
+                                    loader.work_loaded.set(loaded);
+                                    let work_total = loader.work_total.get();
+                                    if let Some(global_onprogress) = loader.global_onprogress.as_mut()
+                                    {
+                                        global_onprogress(loaded, work_total);
+                                    }
+                                }
+                            }
+                        }) as Box<dyn FnMut(_)>)
+                };
+            http_request.onprogress = Some(closure);
+            http_request.internal.set_onprogress(Some(http_request.onprogress.as_ref().unwrap().as_ref().unchecked_ref()));
+
+            http_request.internal.open(&http_request.method, &http_request.url).expect("request opened");
+            http_request.internal.send().expect("request sent");
+        }
+        loader.borrow_mut().http_requests = http_requests;
+    }
 }
 
 impl Drop for ResourceLoader
