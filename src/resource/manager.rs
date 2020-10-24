@@ -30,11 +30,17 @@ impl ResourceManager
         self.resources.insert(resource)
     }
 
+    /// Insert the resource and associate it with a string key
+    ///
+    /// If `name` already exists, it overwrites the existing resource
     #[allow(dead_code)]
     pub fn insert_with_name(&mut self, name: String, resource: Vec<u8>) -> ResourceHandle
     {
         let handle = self.insert(resource);
-        self.handle_map.insert(name, handle);
+        if let Some(old) = self.handle_map.insert(name, handle)
+        {
+            self.resources.remove(old);
+        }
         handle
     }
 
