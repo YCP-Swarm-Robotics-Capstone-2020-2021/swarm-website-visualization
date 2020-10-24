@@ -155,9 +155,6 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
 
     let context = new_context(&canvas)?;
 
-    context.enable(Context::CULL_FACE);
-    context.enable(Context::DEPTH_TEST);
-
     let cube_obj = resource_manager.borrow().get_by_name(&"/Cube.obj".to_string()).expect("cube obj resource").clone();
     let mesh = Mesh::from_reader(&*cube_obj).expect("cube");
 
@@ -420,8 +417,15 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
                 }
         };
 
+    let context_config_func = move |context: &Context|
+        {
+            context.enable(Context::CULL_FACE);
+            context.enable(Context::DEPTH_TEST);
+        };
+    context_config_func(&context.borrow());
+
     // Setup and start render loop
-    let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func).expect("render_loop")));
+    let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func, context_config_func).expect("render_loop")));
     render_loop.borrow_mut().start().unwrap();
 
     {
