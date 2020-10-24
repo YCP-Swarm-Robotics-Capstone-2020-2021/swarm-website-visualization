@@ -24,11 +24,13 @@ impl ResourceManager
         }
     }
 
+    #[allow(dead_code)]
     pub fn insert(&mut self, resource: Vec<u8>) -> ResourceHandle
     {
         self.resources.insert(resource)
     }
 
+    #[allow(dead_code)]
     pub fn insert_with_name(&mut self, name: String, resource: Vec<u8>) -> ResourceHandle
     {
         let handle = self.insert(resource);
@@ -36,22 +38,32 @@ impl ResourceManager
         handle
     }
 
+    #[allow(dead_code)]
     pub fn get(&self, handle: ResourceHandle) -> Option<&Vec<u8>>
     {
         self.resources.get(handle)
     }
 
+    #[allow(dead_code)]
     pub fn get_by_name(&self, name: &String) -> Option<&Vec<u8>>
     {
         let handle = *self.handle_map.get(name)?;
         self.get(handle)
     }
 
+    #[allow(dead_code)]
+    pub fn get_named_handle(&self, name: &String) -> Option<ResourceHandle>
+    {
+        self.handle_map.get(name).copied()
+    }
+
+    #[allow(dead_code)]
     pub fn remove(&mut self, handle: ResourceHandle) -> Option<Vec<u8>>
     {
         self.resources.remove(handle)
     }
 
+    #[allow(dead_code)]
     pub fn remove_by_name(&mut self, name: &String) -> Option<Vec<u8>>
     {
         let handle = self.handle_map.remove(name)?;
