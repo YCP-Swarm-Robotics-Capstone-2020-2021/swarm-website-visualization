@@ -45,6 +45,7 @@ features = [
     'Performance',
     'FocusEvent',
     'XmlHttpRequest',
+    'XmlHttpRequestResponseType',
     'ProgressEvent',
 
     # WebGL stuff
