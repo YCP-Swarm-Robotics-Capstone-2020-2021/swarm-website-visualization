@@ -258,6 +258,7 @@ mod tests
                 },
         },
     };
+    use crate::gfx::gl_object::traits::Bindable;
 
     fn get_shader_program() -> (Context, ShaderProgram)
     {
@@ -267,6 +268,7 @@ mod tests
             Some(BASIC_VERT.to_string()),
             Some(BASIC_FRAG.to_string())
         ).expect("shader program");
+        shader_program.bind_internal();
         (context, shader_program)
     }
 

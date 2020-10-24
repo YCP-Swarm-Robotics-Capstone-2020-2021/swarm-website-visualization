@@ -215,6 +215,7 @@ mod tests
     {
         let context = get_context();
         let mut buffer = ArrayBuffer::new(&context).expect("array buffer");
+        buffer.bind_internal();
         assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
 
         let mut buff: [u8; 4] = [0, 1, 2, 3];
@@ -223,7 +224,7 @@ mod tests
 
         // TODO: This fails, is it because of the testing environment or
         //  is there actually a bug somewhere?
-        //assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
+        assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
 
         buff[1] = 4;
         buffer.buffer_sub_data(1, &[4u8]);
@@ -235,6 +236,7 @@ mod tests
     {
         let context = get_context();
         let mut buffer = ArrayBuffer::new(&context).expect("array buffer");
+        buffer.bind_internal();
         buffer.bind_range(0, 0, 1);
 
         assert_eq!(Some(RangeBinding(0, 0, 1)), buffer.range_bindings[0]);
