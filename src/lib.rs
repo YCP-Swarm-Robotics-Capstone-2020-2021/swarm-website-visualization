@@ -175,9 +175,9 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
             data: vec![
                 128,   0,   0, 255,
                 128,   0, 128, 255,
-                0, 128, 128, 255,
-                0,   0, 128, 255,
-                51, 153, 102, 255,
+                  0, 128, 128, 255,
+                  0,   0, 128, 255,
+                 51, 153, 102, 255,
                 128, 128, 128, 255,
             ]
         }).expect("texture")
