@@ -31,6 +31,7 @@ extern crate float_cmp;
 mod gfx;
 mod input;
 mod math;
+mod resource;
 
 use crate::
 {
@@ -68,6 +69,11 @@ use crate::
         states::{InputState, InputStateListener},
     },
     math::transform::{Transformation},
+    resource::
+    {
+        loader::{ResourceLoader, OnloadCallbackArgs,},
+        manager::ResourceManager,
+    },
 };
 use cgmath::{vec3, Deg};
 
@@ -89,14 +95,54 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
-const CUBE_WAVEFRONT: &'static str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cube.obj"));
 
-#[wasm_bindgen(start)]
-pub fn start_visualization() -> Result<(), JsValue>
+fn init() -> Result<(), JsValue>
 {
-    // Allow panics to print to javascript console if debug build
-    #[cfg(feature="debug")]
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    let resource_manager = Rc::new(RefCell::new(ResourceManager::new()));
+
+    let mut resource_loader = ResourceLoader::new();
+
+    {
+        let request_handle = resource_loader.add_request("GET", "/Cube.obj")?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                resource_manager.borrow_mut().insert_with_name("/Cube.obj".to_string(), bytes);
+            });
+    }
+    {
+        let request_handle = resource_loader.add_request("GET", "/shaders/texture_vert.glsl")?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                resource_manager.borrow_mut().insert_with_name("/shaders/texture_vert.glsl".to_string(), bytes);
+            });
+    }
+    {
+        {
+            let request_handle = resource_loader.add_request("GET", "/shaders/texture_frag.glsl")?;
+            clone!(resource_manager);
+            resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+                {
+                    resource_manager.borrow_mut().insert_with_name("/shaders/texture_frag.glsl".to_string(), bytes);
+                });
+        }
+    }
+
+    {
+        clone!(resource_manager);
+        resource_loader.set_onloadend(move ||
+            {
+                start(resource_manager).expect("visualization start() func");
+            });
+    }
+    resource_loader.submit();
+
+    Ok(())
+}
+
+fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
+{
 
     // Get HTML element references
     let window: Window = window().expect("window context");
@@ -112,7 +158,8 @@ pub fn start_visualization() -> Result<(), JsValue>
     context.enable(Context::CULL_FACE);
     context.enable(Context::DEPTH_TEST);
 
-    let mesh = Mesh::from_reader(String::from(CUBE_WAVEFRONT).as_bytes()).expect("cube");
+    let cube_obj = resource_manager.borrow().get_by_name(&"/Cube.obj".to_string()).expect("cube obj resource").clone();
+    let mesh = Mesh::from_reader(&*cube_obj).expect("cube");
 
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
@@ -131,9 +178,9 @@ pub fn start_visualization() -> Result<(), JsValue>
             data: vec![
                 128,   0,   0, 255,
                 128,   0, 128, 255,
-                  0, 128, 128, 255,
-                  0,   0, 128, 255,
-                 51, 153, 102, 255,
+                0, 128, 128, 255,
+                0,   0, 128, 255,
+                51, 153, 102, 255,
                 128, 128, 128, 255,
             ]
         }).expect("texture")
@@ -201,7 +248,7 @@ pub fn start_visualization() -> Result<(), JsValue>
     let delta_time: f32 = 0.01;
     let mut accumulator: f32 = 0.0;
 
-    let renderer = Renderer::new(&context.borrow(), &mut manager.borrow_mut()).expect("renderer");
+    let renderer = Renderer::new(&context.borrow(), &mut manager.borrow_mut(), &resource_manager.borrow()).expect("renderer");
 
     // Setup render information for cube
     let mut transformation_t1 = Transformation::new();
@@ -399,6 +446,17 @@ pub fn start_visualization() -> Result<(), JsValue>
         let ev = EventListener::new(&canvas, "wheel", callback).expect("event listener registered");
         ev.forget();
     }
+
+    Ok(())
+}
+
+#[wasm_bindgen(start)]
+pub fn start_visualization() -> Result<(), JsValue>
+{
+    #[cfg(feature="debug")]
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+    init()?;
 
     Ok(())
 }
