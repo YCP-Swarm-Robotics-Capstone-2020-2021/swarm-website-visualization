@@ -233,14 +233,23 @@ mod tests
     {
         gl_object::
         {
-            shader_program::
-                {
-                    ShaderProgram,
-                    shader_source::{BASIC_VERT, BASIC_FRAG}
-                },
+            shader_program::ShaderProgram,
         },
     };
     use crate::gfx::gl_object::traits::Bindable;
+
+    // Embed shaders into test executable so that we can test ShaderProgram alone instead of
+    //      going through ResourceLoader. Since this is in a cfg(test) module, it won't be
+    //      included in the normal builds
+    macro_rules! shader_source
+    {
+        ($path:expr) =>
+        {
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), concat!("/", $path)))
+        };
+    }
+    pub const BASIC_VERT: &'static str = shader_source!("shaders/basic_vert.glsl");
+    pub const BASIC_FRAG: &'static str = shader_source!("shaders/basic_frag.glsl");
 
     fn get_shader_program() -> (Context, ShaderProgram)
     {
