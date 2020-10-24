@@ -23,6 +23,8 @@ use std::
 #[macro_use]
 mod redeclare;
 #[macro_use]
+mod test_util;
+#[macro_use]
 extern crate memoffset;
 
 mod gfx;
