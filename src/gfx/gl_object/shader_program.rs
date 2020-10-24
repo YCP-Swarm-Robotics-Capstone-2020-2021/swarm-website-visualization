@@ -227,20 +227,10 @@ impl Drop for ShaderProgram
 #[cfg(test)]
 mod tests
 {
-    use wasm_bindgen_test::*;
-    wasm_bindgen_test_configure!(run_in_browser);
-    use wasm_bindgen::
-    {
-        prelude::*,
-        JsCast,
-    };
-    use web_sys::*;
+    inject_wasm_test_boilerplate!();
+
     use crate::gfx::
     {
-        Context,
-        GfxError,
-        GlError,
-        gl_get_errors,
         gl_object::
         {
             shader_program::
@@ -250,21 +240,6 @@ mod tests
                 },
         },
     };
-
-    fn get_context() -> Context
-    {
-        let window: Window = window().expect("window context");
-        let document: Document = window.document().expect("document context");
-
-        let canvas =
-            {
-                let elem = document.create_element("CANVAS").expect("new canvas element");
-                elem.set_id("canvas");
-                document.body().expect("document body").append_child(&elem).expect("canvas added to body");
-                elem.dyn_into::<HtmlCanvasElement>().expect("cast canvas element")
-            };
-        crate::gfx::new_context(&canvas).expect("context")
-    }
 
     fn get_shader_program() -> (Context, ShaderProgram)
     {

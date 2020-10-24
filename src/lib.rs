@@ -22,6 +22,8 @@ use std::
 #[macro_use]
 mod redeclare;
 #[macro_use]
+mod test_util;
+#[macro_use]
 extern crate memoffset;
 #[macro_use]
 extern crate float_cmp;
