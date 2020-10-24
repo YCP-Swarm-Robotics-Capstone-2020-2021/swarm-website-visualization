@@ -54,14 +54,6 @@ impl HttpRequest
         })
     }
 }
-impl Drop for HttpRequest
-{
-    fn drop(&mut self)
-    {
-        // TODO: Remove when done testing
-        crate::log("http request dropped");
-    }
-}
 
 pub struct CallbackArgs(pub ProgressEvent, pub XmlHttpRequest);
 pub struct OnloadCallbackArgs(pub CallbackArgs, pub Vec<u8>);
@@ -422,16 +414,6 @@ impl ResourceLoader
         // Now that all of the requests have been processed, pass them back into the ResourceLoader
         //      so that they can be cleaned up when everything is finished
         loader.borrow_mut().http_requests = http_requests;
-    }
-}
-
-impl Drop for ResourceLoader
-{
-    fn drop(&mut self)
-    {
-        // TODO: Remove when done testing
-        crate::log("start drop");
-        crate::log("end drop");
     }
 }
 
