@@ -22,6 +22,8 @@ use std::
 #[macro_use]
 mod redeclare;
 #[macro_use]
+mod test_util;
+#[macro_use]
 extern crate memoffset;
 #[macro_use]
 extern crate float_cmp;
@@ -90,7 +92,7 @@ fn log_s(s: String)
 const CUBE_WAVEFRONT: &'static str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cube.obj"));
 
 #[wasm_bindgen(start)]
-pub fn main() -> Result<(), JsValue>
+pub fn start_visualization() -> Result<(), JsValue>
 {
     // Allow panics to print to javascript console if debug build
     #[cfg(feature="debug")]

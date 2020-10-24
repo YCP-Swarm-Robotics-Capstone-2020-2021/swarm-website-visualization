@@ -21,7 +21,7 @@ pub trait Buffer : crate::gfx::gl_object::traits::GlObject
     fn bind_range(&mut self, index: u32, offset: i32, size: i32);
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq, Hash)]
 pub struct RangeBinding(pub u32, pub i32, pub i32);
 
 /// Implements the buffer trait for either a pre-existing struct or
@@ -192,4 +192,53 @@ macro_rules! impl_buffer
                 }
             }
     };
+}
+
+
+#[cfg(test)]
+mod tests
+{
+    inject_wasm_test_boilerplate!();
+
+    use crate::gfx::
+    {
+        gl_object::
+        {
+            traits::Bindable,
+            buffer::{Buffer, RangeBinding},
+            ArrayBuffer,
+        },
+    };
+
+    #[wasm_bindgen_test]
+    fn test_buffer_data()
+    {
+        let context = get_context();
+        let mut buffer = ArrayBuffer::new(&context).expect("array buffer");
+        buffer.bind_internal();
+        assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
+
+        let mut buff: [u8; 4] = [0, 1, 2, 3];
+        buffer.buffer_data(&buff, Context::STATIC_DRAW);
+        assert_eq!(&buff, buffer.buffer.as_slice());
+
+        // TODO: This fails, is it because of the testing environment or
+        //  is there actually a bug somewhere?
+        assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
+
+        buff[1] = 4;
+        buffer.buffer_sub_data(1, &[4u8]);
+        assert_eq!(&buff, buffer.buffer.as_slice());
+    }
+
+    #[wasm_bindgen_test]
+    fn test_range_bindings()
+    {
+        let context = get_context();
+        let mut buffer = ArrayBuffer::new(&context).expect("array buffer");
+        buffer.bind_internal();
+        buffer.bind_range(0, 0, 1);
+
+        assert_eq!(Some(RangeBinding(0, 0, 1)), buffer.range_bindings[0]);
+    }
 }
