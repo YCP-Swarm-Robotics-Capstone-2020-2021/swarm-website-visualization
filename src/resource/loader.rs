@@ -6,7 +6,13 @@ use wasm_bindgen::
 use web_sys::
 {
     XmlHttpRequest,
+    XmlHttpRequestResponseType,
     ProgressEvent,
+};
+use js_sys::
+{
+    ArrayBuffer,
+    Uint8Array,
 };
 use std::
 {
@@ -57,6 +63,9 @@ impl Drop for HttpRequest
     }
 }
 
+pub struct CallbackArgs(pub ProgressEvent, pub XmlHttpRequest);
+pub struct OnloadCallbackArgs(pub CallbackArgs, pub Vec<u8>);
+
 /// Resource Loader
 ///
 /// This is for loading resources from a URL. It's intended for loading visualization assets but
@@ -89,7 +98,8 @@ impl ResourceLoader
         }
     }
     /// Add an overall "when everything is done" function to the loader
-    pub fn set_onloadend<F>(&self, mut callback: F) where F: 'static + FnOnce()
+    #[allow(dead_code)]
+    pub fn set_onloadend<F>(&self, callback: F) where F: 'static + FnOnce()
     {
         self.global_onloadend.set(Some(Box::new(callback)));
     }
@@ -97,7 +107,8 @@ impl ResourceLoader
     ///
     /// First arg of `callback` is amount of work already performed
     /// Second arg of `callback` is total amount of work to be done
-    pub fn set_onprogress<F>(&mut self, mut callback: F) where F: 'static + FnMut(f64, f64)
+    #[allow(dead_code)]
+    pub fn set_onprogress<F>(&mut self, callback: F) where F: 'static + FnMut(f64, f64)
     {
         self.global_onprogress = Some(Box::new(callback));
     }
@@ -107,10 +118,14 @@ impl ResourceLoader
     /// `method` is the HTTP method to use (GET, POST, etc)
     /// `url` is the resource URL
     /// Returns a handle to the request for use in assigning callbacks
+    #[allow(dead_code)]
     pub fn add_request(&mut self, method: impl Into<String>, url: impl Into<String>) -> Result<RequestHandle, JsValue>
     {
-        // Add a new request
-        self.http_requests.push(HttpRequest::new(method.into(), url.into())?);
+        // Set the response type to Arraybuffer so that the response can be read into a byte array
+        let request = HttpRequest::new(method.into(), url.into())?;
+        request.internal.set_response_type(XmlHttpRequestResponseType::Arraybuffer);
+        // Add the new request
+        self.http_requests.push(request);
         // Increment the number of requests that are going to be executed
         self.requests_left.set(self.requests_left.get() + 1);
 
@@ -118,8 +133,9 @@ impl ResourceLoader
     }
 
     /// Set the `onabort` event callback for a request
-    pub fn set_request_onabort<F>(&mut self, handle: RequestHandle, mut onabort: F)
-        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    #[allow(dead_code)]
+    pub fn set_request_onabort<F>(&mut self, handle: RequestHandle, onabort: F)
+        -> bool where F: 'static + FnOnce(CallbackArgs)
     {
         // Make sure the handle is valid
         if let Some(http_request) = self.http_requests.get_mut(handle)
@@ -128,7 +144,7 @@ impl ResourceLoader
             clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    onabort(internal, event);
+                    onabort(CallbackArgs(event, internal));
                 });
             // Assign the closure to the request and it's internal JS object
             http_request.onabort = Some(closure);
@@ -140,8 +156,9 @@ impl ResourceLoader
     }
 
     /// Set the `onerror` event callback for a request
-    pub fn set_request_onerror<F>(&mut self, handle: RequestHandle, mut onerror: F)
-        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    #[allow(dead_code)]
+    pub fn set_request_onerror<F>(&mut self, handle: RequestHandle, onerror: F)
+        -> bool where F: 'static + FnOnce(CallbackArgs)
     {
         // Make sure the handle is valid
         if let Some(http_request) = self.http_requests.get_mut(handle)
@@ -150,7 +167,7 @@ impl ResourceLoader
             clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    onerror(internal, event);
+                    onerror(CallbackArgs(event, internal));
                 });
             // Assign the closure to the request and it's internal JS object
             http_request.onerror = Some(closure);
@@ -162,8 +179,9 @@ impl ResourceLoader
     }
 
     /// Set the `onload` event callback for a request
-    pub fn set_request_onload<F>(&mut self, handle: RequestHandle, mut onload: F)
-        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    #[allow(dead_code)]
+    pub fn set_request_onload<F>(&mut self, handle: RequestHandle, onload: F)
+        -> bool where F: 'static + FnOnce(OnloadCallbackArgs)
     {
         // Make sure the handle is valid
         if let Some(http_request) = self.http_requests.get_mut(handle)
@@ -172,7 +190,21 @@ impl ResourceLoader
             clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    onload(internal, event);
+                    let mut response_vec: Vec<u8> = vec![];
+                    match internal.response()
+                    {
+                        Ok(response) =>
+                            {
+                                let buffer: ArrayBuffer = response.into();
+                                let byte_arr = Uint8Array::new(&buffer);
+                                response_vec = byte_arr.to_vec();
+                            },
+                        Err(err) =>
+                            {
+                                crate::log_s(format!("Error getting request response: {:?}", err));
+                            }
+                    }
+                    onload(OnloadCallbackArgs(CallbackArgs(event, internal), response_vec));
                 });
             // Assign the closure to the request and it's internal JS object
             http_request.onload = Some(closure);
@@ -184,8 +216,9 @@ impl ResourceLoader
     }
 
     /// Set the `onloadstart` event callback for a request
-    pub fn set_request_onloadstart<F>(&mut self, handle: RequestHandle, mut onloadstart: F)
-        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    #[allow(dead_code)]
+    pub fn set_request_onloadstart<F>(&mut self, handle: RequestHandle, onloadstart: F)
+        -> bool where F: 'static + FnOnce(CallbackArgs)
     {
         // Make sure the handle is valid// Make sure the handle is valid// Make sure the handle is valid// Make sure the handle is valid
         if let Some(http_request) = self.http_requests.get_mut(handle)
@@ -198,7 +231,7 @@ impl ResourceLoader
                     {
                         work_total.set(work_total.get() + event.total());
                     }
-                    onloadstart(internal, event);
+                    onloadstart(CallbackArgs(event, internal));
                 });
             // Assign the closure to the request and it's internal JS object// Assign the closure to the request and it's internal JS object// Assign the closure to the request and it's internal JS object// Assign the closure to the request and it's internal JS object
             http_request.onloadstart = Some(closure);
@@ -210,8 +243,9 @@ impl ResourceLoader
     }
 
     /// Set the `onloadend` event callback for a request
-    pub fn set_request_onloadend<F>(&mut self, handle: RequestHandle, mut onloadend: F)
-        -> bool where F: 'static + FnOnce(XmlHttpRequest, ProgressEvent)
+    #[allow(dead_code)]
+    pub fn set_request_onloadend<F>(&mut self, handle: RequestHandle, onloadend: F)
+        -> bool where F: 'static + FnOnce(CallbackArgs)
     {
         // Make sure the handle is valid
         if let Some(http_request) = self.http_requests.get_mut(handle)
@@ -220,7 +254,7 @@ impl ResourceLoader
             clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    onloadend(internal, event);
+                    onloadend(CallbackArgs(event, internal));
                 });
             // Assign the closure to the request and it's internal JS object
             http_request.onloadend = Some(closure);
@@ -232,16 +266,18 @@ impl ResourceLoader
     }
 
     /// Set the `onprogress` event callback for a request
+    #[allow(dead_code)]
     pub fn set_request_onprogress<F>(&mut self, handle: RequestHandle, mut onprogress: F)
-        -> bool where F: 'static + FnMut(ProgressEvent)
+        -> bool where F: 'static + FnMut(CallbackArgs)
     {
         // Make sure the handle is valid
         if let Some(http_request) = self.http_requests.get_mut(handle)
         {
            // Create the closure
+            let internal = http_request.internal.clone();
             let closure = Closure::wrap(Box::new(move |event: ProgressEvent|
                 {
-                    onprogress(event);
+                    onprogress(CallbackArgs(event, internal.clone()));
                 }) as Box<dyn FnMut(_)>);
             // Assign the closure to the request and it's internal JS object
             http_request.onprogress = Some(closure);
@@ -253,7 +289,7 @@ impl ResourceLoader
     }
 
     /// Add a resource to be loaded
-    // TODO: Return error(s)
+    #[allow(dead_code)]
     pub fn submit(self)
     {
         let mut loader = self;
@@ -277,11 +313,14 @@ impl ResourceLoader
                     Closure::once(move |event: ProgressEvent|
                         {
                             // If the user provided a callback, execute it
-                            if let Some(mut onloadend) = onloadend
+                            if let Some(onloadend) = onloadend
                             {
-                                // TODO: Error checking instead of calling unwrap()
                                 // Convert the closure into a JS function and call it
-                                onloadend.into_js_value().dyn_into::<js_sys::Function>().unwrap().call1(&JsValue::null(), &event).expect("function call");
+                                let onloadend: js_sys::Function = onloadend.into_js_value().into();
+                                if let Err(err) = onloadend.call1(&JsValue::null(), &event)
+                                {
+                                    crate::log_s(format!("Error executing request onloadend func: {:?}", err))
+                                }
                             }
 
                             let loader_borrow = loader.borrow();
@@ -296,7 +335,7 @@ impl ResourceLoader
                                 //      This is what keeps the ResourceLoader alive throughout
                                 //      all of the request executions, and after this expression
                                 //      the ResourceLoader and all of the requests are dropped
-                                if let Some(mut global_onloadend) = loader_borrow.global_onloadend.take()
+                                if let Some(global_onloadend) = loader_borrow.global_onloadend.take()
                                 {
                                     global_onloadend();
                                 }
@@ -314,9 +353,9 @@ impl ResourceLoader
                     let onprogress = http_request.onprogress.take();
 
                     // Convert the closure into a JS function if the closure exists
-                    let onprogress = if let Some(closure) = onprogress
+                    let onprogress: Option<js_sys::Function> = if let Some(closure) = onprogress
                     {
-                        Some(closure.into_js_value().dyn_into::<js_sys::Function>().unwrap())
+                        Some(closure.into_js_value().into())
                     }
                     else { None };
                     // Wrap the callback in Rc<RefCell<_>> since we need to call it multiple times
@@ -328,10 +367,12 @@ impl ResourceLoader
                     Closure::wrap(Box::new(move |event: ProgressEvent|
                         {
                             // If the user provided a callback, execute it
-                            if let Some(mut onprogress) = onprogress.borrow_mut().as_mut()
+                            if let Some(onprogress) = onprogress.borrow_mut().as_mut()
                             {
-                                // TODO: Error checking instead of calling unwrap()
-                                onprogress.call1(&JsValue::null(), &event).expect("function call");
+                                if let Err(err) = onprogress.call1(&JsValue::null(), &event)
+                                {
+                                    crate::log_s(format!("Error executing request onprogress func: {:?}", err))
+                                }
                             }
 
                             // Include this in the global progress tracking only if it is actually
