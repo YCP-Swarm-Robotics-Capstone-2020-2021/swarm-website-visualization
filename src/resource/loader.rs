@@ -427,3 +427,62 @@ impl Drop for ResourceLoader
         crate::log("end drop");
     }
 }
+
+#[cfg(test)]
+mod tests
+{
+    inject_wasm_test_boilerplate!();
+    use wasm_bindgen_futures::JsFuture;
+    use js_sys::Promise;
+
+    use crate::
+    {
+        resource::
+        {
+            loader::*
+        }
+    };
+    use std::{rc::Rc, cell::{RefCell, Cell}};
+
+    // https://www.reddit.com/r/rust/comments/cpxjlw/wasmasync_discoveris_about_sleepawait_via/
+    pub async fn timer(ms: i32) -> Result<(), JsValue> {
+        let promise = Promise::new(&mut |yes, _| {
+            let win = window().unwrap();
+            win.set_timeout_with_callback_and_timeout_and_arguments_0(&yes, ms)
+                .unwrap();
+        });
+        let js_fut = JsFuture::from(promise);
+        js_fut.await?;
+        Ok(())
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_resource_retrieval()
+    {
+        let mut resource_loader = ResourceLoader::new();
+
+        let expected_contents = String::from(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/build.py")));
+        let request_handle = resource_loader.add_request("GET", "/build.py").unwrap();
+
+        let done = Rc::new(Cell::new(false));
+        let contents = Rc::new(Cell::new(None));
+
+        {
+            clone!(done, contents);
+            resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, response)|
+                {
+                    contents.set(Some(String::from_utf8(response).unwrap()));
+                    done.set(true);
+                });
+        }
+        resource_loader.submit();
+
+        let mut counter = 0;
+        while !done.get() && counter < 100
+        {
+            counter += 1;
+            timer(1).await.unwrap();
+        }
+        assert_eq!(Some(expected_contents), contents.take());
+    }
+}
