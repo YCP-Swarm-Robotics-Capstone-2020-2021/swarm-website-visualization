@@ -224,13 +224,9 @@ impl ResourceLoader
         if let Some(http_request) = self.http_requests.get_mut(handle)
         {
             // Create the closure// Create the closure// Create the closure// Create the closure
-            clone!(http_request.internal, self.work_total);
+            clone!(http_request.internal);
             let closure = Closure::once(move |event: ProgressEvent|
                 {
-                    if event.length_computable()
-                    {
-                        work_total.set(work_total.get() + event.total());
-                    }
                     onloadstart(CallbackArgs(event, internal));
                 });
             // Assign the closure to the request and it's internal JS object// Assign the closure to the request and it's internal JS object// Assign the closure to the request and it's internal JS object// Assign the closure to the request and it's internal JS object
@@ -274,7 +270,7 @@ impl ResourceLoader
         if let Some(http_request) = self.http_requests.get_mut(handle)
         {
            // Create the closure
-            let internal = http_request.internal.clone();
+            clone!(http_request.internal);
             let closure = Closure::wrap(Box::new(move |event: ProgressEvent|
                 {
                     onprogress(CallbackArgs(event, internal.clone()));
@@ -363,6 +359,8 @@ impl ResourceLoader
                     // Downgrade the loader Rc to a Weak reference so that it doesn't keep
                     //      the loader alive after `global_onloadend` has been called
                     let loader = Rc::downgrade(&loader);
+                    // Has the work total for this request been set
+                    let mut set_total = false;
                     clone!(onprogress);
                     Closure::wrap(Box::new(move |event: ProgressEvent|
                         {
@@ -379,6 +377,7 @@ impl ResourceLoader
                             //      able to be tracked
                             if event.length_computable()
                             {
+
                                 // Attempt to access the loader. If this is false, then
                                 //     `global_onloadend` has already been called. Technically
                                 //      that will never actually happen, since this closure
@@ -388,6 +387,14 @@ impl ResourceLoader
                                 if let Some(loader) = loader.upgrade()
                                 {
                                     borrow_mut!(loader);
+                                    // Add the work total into the overall work total if it hasn't been
+                                    //      already
+                                    if !set_total
+                                    {
+                                        loader.work_total.set(loader.work_total.get() + event.total());
+                                        set_total = true;
+                                    }
+
                                     // Get the total amount of work that has been completed by
                                     //      all requests
                                     let loaded = loader.work_loaded.get() + event.loaded();
@@ -457,7 +464,75 @@ mod tests
     }
 
     #[wasm_bindgen_test]
-    async fn test_resource_retrieval()
+    async fn test_onabort()
+    {
+        let mut resource_loader = ResourceLoader::new();
+
+        let request_handle = resource_loader.add_request("GET", "/build.py").unwrap();
+
+        let abort_executed = Rc::new(Cell::new(false));
+
+        {
+            clone!(abort_executed);
+            resource_loader.set_request_onabort(request_handle, move |_|
+            {
+                abort_executed.set(true);
+            });
+
+            resource_loader.set_request_onloadstart(request_handle, move |CallbackArgs(_, request)|
+                {
+                    request.abort();
+                });
+        }
+        resource_loader.submit();
+
+        // Wait max of 100ms for request to be carried out
+        let mut counter = 0;
+        while !abort_executed.get() && counter < 100
+        {
+            counter += 1;
+            timer(1).await.unwrap();
+        }
+        assert!(abort_executed.get());
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_onerror()
+    {
+        let mut resource_loader = ResourceLoader::new();
+
+        let request_handle = resource_loader.add_request("GET", "/nonexistentfile.txt").unwrap();
+
+        let error_executed = Rc::new(Cell::new(false));
+
+        {
+            clone!(error_executed);
+            resource_loader.set_request_onerror(request_handle, move |_|
+                {
+                    error_executed.set(true);
+                });
+
+            // Trigger the event
+            resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(CallbackArgs(_, request), _)|
+                {
+                    request.dispatch_event(&Event::new("error").unwrap());
+                });
+        }
+        resource_loader.submit();
+
+
+        // Wait max of 100ms for request to be carried out
+        let mut counter = 0;
+        while !error_executed.get() && counter < 100
+        {
+            counter += 1;
+            timer(1).await.unwrap();
+        }
+        assert!(error_executed.get());
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_onload()
     {
         let mut resource_loader = ResourceLoader::new();
 
@@ -477,6 +552,7 @@ mod tests
         }
         resource_loader.submit();
 
+        // Wait max of 100ms for request to be carried out
         let mut counter = 0;
         while !done.get() && counter < 100
         {
@@ -484,5 +560,157 @@ mod tests
             timer(1).await.unwrap();
         }
         assert_eq!(Some(expected_contents), contents.take());
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_onloadstart()
+    {
+        let mut resource_loader = ResourceLoader::new();
+
+        let request_handle = resource_loader.add_request("GET", "/build.py").unwrap();
+
+        let loadstart_executed = Rc::new(Cell::new(false));
+
+        {
+            clone!(loadstart_executed);
+            resource_loader.set_request_onloadstart(request_handle, move |_|
+                {
+                    loadstart_executed.set(true);
+                });
+        }
+        resource_loader.submit();
+
+        // Wait max of 100ms for request to be carried out
+        let mut counter = 0;
+        while !loadstart_executed.get() && counter < 100
+        {
+            counter += 1;
+            timer(1).await.unwrap();
+        }
+        assert!(loadstart_executed.get());
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_onloadend()
+    {
+        let mut resource_loader = ResourceLoader::new();
+
+        let request_handle = resource_loader.add_request("GET", "/build.py").unwrap();
+
+        let loadend_executed = Rc::new(Cell::new(false));
+
+        {
+            clone!(loadend_executed);
+            resource_loader.set_request_onloadend(request_handle, move |_|
+                {
+                    loadend_executed.set(true);
+                });
+        }
+        resource_loader.submit();
+
+        // Wait max of 100ms for request to be carried out
+        let mut counter = 0;
+        while !loadend_executed.get() && counter < 100
+        {
+            counter += 1;
+            timer(1).await.unwrap();
+        }
+        assert!(loadend_executed.get());
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_onprogress()
+    {
+        let mut resource_loader = ResourceLoader::new();
+
+        let request_handle = resource_loader.add_request("GET", "/build.py").unwrap();
+
+        let onprogress_executed = Rc::new(Cell::new(false));
+        let work_total = Rc::new(Cell::new(0.0));
+
+        {
+            clone!(onprogress_executed, work_total);
+            resource_loader.set_request_onprogress(request_handle, move |CallbackArgs(event, _)|
+                {
+                    onprogress_executed.set(true);
+                    work_total.set(event.total());
+                });
+        }
+        resource_loader.submit();
+
+        // Wait max of 100ms for request to be carried out
+        let mut counter = 0;
+        while !onprogress_executed.get() && counter < 100
+        {
+            counter += 1;
+            timer(1).await.unwrap();
+        }
+        assert!(onprogress_executed.get());
+        assert!(work_total.get() > 0.0);
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_global_onloadend()
+    {
+        let mut resource_loader = ResourceLoader::new();
+
+        resource_loader.add_request("GET", "/build.py").unwrap();
+        resource_loader.add_request("GET", "/nonexistentfile.txt").unwrap();
+
+        let global_loadend_executed = Rc::new(Cell::new(false));
+
+        {
+            clone!(global_loadend_executed);
+            resource_loader.set_onloadend(move ||
+                {
+                    global_loadend_executed.set(true);
+                });
+        }
+        resource_loader.submit();
+
+        // Wait max of 100ms for request to be carried out
+        let mut counter = 0;
+        while !global_loadend_executed.get() && counter < 100
+        {
+            counter += 1;
+            timer(1).await.unwrap();
+        }
+        assert!(global_loadend_executed.get());
+    }
+
+    #[wasm_bindgen_test]
+    async fn test_global_onprogress()
+    {
+        let mut resource_loader = ResourceLoader::new();
+
+        resource_loader.add_request("GET", "/build.py").unwrap();
+        resource_loader.add_request("GET", "/build.py").unwrap();
+
+        let work_loaded = Rc::new(Cell::new(0.0));
+        let work_total = Rc::new(Cell::new(0.0));
+        let num_executions = Rc::new(Cell::new(0));
+
+        {
+            clone!(work_loaded, work_total, num_executions);
+            resource_loader.set_onprogress(move |current, total|
+                {
+                    work_loaded.set(current);
+                    work_total.set(total);
+                    crate::log_s(format!("{} - {}", current, total));
+                    num_executions.set(num_executions.get() + 1);
+                });
+        }
+        resource_loader.submit();
+
+        // Wait max of 100ms for request to be carried out
+        let mut counter = 0;
+        while !num_executions.get() < 2 && counter < 100
+        {
+            counter += 1;
+            timer(1).await.unwrap();
+        }
+        assert_eq!(num_executions.get(), 2);
+        assert!(work_total.get() > 0.0);
+        assert!(work_loaded.get() > 0.0);
     }
 }
