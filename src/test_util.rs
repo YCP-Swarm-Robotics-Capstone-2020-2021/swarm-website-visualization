@@ -1,15 +1,20 @@
+#[allow(unused_macros)]
 macro_rules! inject_wasm_test_boilerplate
 {
     () =>
     {
+        #[allow(unused_imports)]
         use wasm_bindgen_test::*;
         wasm_bindgen_test_configure!(run_in_browser);
+        #[allow(unused_imports)]
         use wasm_bindgen::
         {
             prelude::*,
             JsCast,
         };
+        #[allow(unused_imports)]
         use web_sys::*;
+        #[allow(unused_imports)]
         use crate::gfx::
         {
             Context,
@@ -18,6 +23,7 @@ macro_rules! inject_wasm_test_boilerplate
             gl_get_errors,
         };
 
+        #[allow(dead_code)]
         fn get_context() -> Context
         {
             let window: Window = window().expect("window context");

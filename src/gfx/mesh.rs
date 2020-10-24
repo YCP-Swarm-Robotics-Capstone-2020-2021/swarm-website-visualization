@@ -5,7 +5,6 @@ use std::
     collections::HashMap,
 };
 use twox_hash::XxHash32;
-use crate::gfx::GfxError;
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
@@ -71,7 +70,7 @@ impl Mesh
 
         // Load OBJ and associate with materials
         let mut bufreader = io::BufReader::new(obj_reader);
-        let (models, _materials) = tobj::load_obj_buf(&mut bufreader, true, |p|
+        let (models, _materials) = tobj::load_obj_buf(&mut bufreader, true, |_p|
             {
                 // Placeholder to ignore any material files
                 tobj::load_mtl_buf(&mut io::BufReader::new("".to_string().as_bytes()))

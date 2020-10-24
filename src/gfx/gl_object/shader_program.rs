@@ -254,7 +254,7 @@ mod tests
     fn get_shader_program() -> (Context, ShaderProgram)
     {
         let context = get_context();
-        let mut shader_program = ShaderProgram::new(
+        let shader_program = ShaderProgram::new(
             &context,
             Some(BASIC_VERT.to_string()),
             Some(BASIC_FRAG.to_string())
@@ -266,7 +266,7 @@ mod tests
     #[wasm_bindgen_test]
     fn test_creation()
     {
-        let (context, shader_program) = get_shader_program();
+        let (context, _shader_program) = get_shader_program();
         assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
     }
 
@@ -276,7 +276,7 @@ mod tests
     #[wasm_bindgen_test]
     fn test_block_bindings()
     {
-        let (context, mut shader_program) = get_shader_program();
+        //let (context, mut shader_program) = get_shader_program();
 
         // TODO:
         //shader_program.add_uniform_block_binding("fake_block", 0).unwrap();
@@ -286,7 +286,7 @@ mod tests
     #[wasm_bindgen_test]
     fn test_set_uniform()
     {
-        let (context, mut shader_program) = get_shader_program();
+        //let (context, mut shader_program) = get_shader_program();
 
         // TODO:
         //shader_program.set_uniform_i32("fake_uniform", &[0]).unwrap();

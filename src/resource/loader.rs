@@ -431,7 +431,7 @@ mod tests
             loader::*
         }
     };
-    use std::{rc::Rc, cell::{RefCell, Cell}};
+    use std::{rc::Rc, cell::Cell};
 
     // https://www.reddit.com/r/rust/comments/cpxjlw/wasmasync_discoveris_about_sleepawait_via/
     pub async fn timer(ms: i32) -> Result<(), JsValue> {
@@ -463,7 +463,7 @@ mod tests
 
             resource_loader.set_request_onloadstart(request_handle, move |CallbackArgs(_, request)|
                 {
-                    request.abort();
+                    request.abort().unwrap();
                 });
         }
         resource_loader.submit();
@@ -497,7 +497,7 @@ mod tests
             // Trigger the event
             resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(CallbackArgs(_, request), _)|
                 {
-                    request.dispatch_event(&Event::new("error").unwrap());
+                    request.dispatch_event(&Event::new("error").unwrap()).unwrap();
                 });
         }
         resource_loader.submit();
