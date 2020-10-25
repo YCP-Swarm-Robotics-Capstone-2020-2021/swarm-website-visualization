@@ -248,8 +248,8 @@ mod tests
             include_str!(concat!(env!("CARGO_MANIFEST_DIR"), concat!("/", $path)))
         };
     }
-    pub const BASIC_VERT: &'static str = shader_source!("shaders/basic_vert.glsl");
-    pub const BASIC_FRAG: &'static str = shader_source!("shaders/basic_frag.glsl");
+    pub const BASIC_VERT: &'static str = shader_source!("/resources/shaders/basic_vert.glsl");
+    pub const BASIC_FRAG: &'static str = shader_source!("/resources/shaders/basic_frag.glsl");
 
     fn get_shader_program() -> (Context, ShaderProgram)
     {
