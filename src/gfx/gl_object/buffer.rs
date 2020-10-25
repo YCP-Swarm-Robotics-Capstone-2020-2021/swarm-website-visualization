@@ -222,8 +222,6 @@ mod tests
         buffer.buffer_data(&buff, Context::STATIC_DRAW);
         assert_eq!(&buff, buffer.buffer.as_slice());
 
-        // TODO: This fails, is it because of the testing environment or
-        //  is there actually a bug somewhere?
         assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
 
         buff[1] = 4;

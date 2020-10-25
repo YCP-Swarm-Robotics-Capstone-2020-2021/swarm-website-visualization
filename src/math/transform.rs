@@ -367,7 +367,7 @@ mod tests
 
         // Test orientation on I
         t.global.rotate_angle_axis(Deg(1.0), vec3(1.0, 0.0, 1.0));
-        let expected: [f32; 16] = [0.9998477, 0.01745108, 0.00015229327, 0.0, -0.01745108, 0.9996954, 0.01745108, 0.0, 0.00015229327, -0.01745108, 0.9998477, 0.0, 0.0, 0.0, 0.0, 1.0];
+        let expected: [f32; 16] =  [0.9998477, 0.01745108, 0.00015229327, 0.0, -0.01745108, 0.9996954, 0.01745108, 0.0, 0.00015229327, -0.01745108, 0.9998477, 0.0, 0.0, 0.0, 0.0, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
 
@@ -376,17 +376,17 @@ mod tests
         // Test orientation on transformation with translation
         t.global.translate(vec3(1.0, 1.0, 0.0));
         t.global.rotate_angle_axis(Deg(23.0), vec3(1.0, 0.0, 1.0));
-        let expected: [f32; 16] = [0.9235438, 0.3757942, 0.0764562, 0.0, -0.3757942, 0.8470876, 0.3757942, 0.0, 0.0764562, -0.3757942, 0.9235438, 0.0, 0.5477496, 1.2228818, 0.45225042, 1.0];
+        let expected: [f32; 16] = [0.9235438, 0.37579432, 0.07645622, 0.0, -0.37579432, 0.8470876, 0.37579432, 0.0, 0.07645622, -0.37579432, 0.9235438, 0.0, 0.5297738, 1.2317408, 0.47022623, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
 
         t.global.set_orientation_angle_axis(Deg(0.0), vec3(0.0, 0.0, 0.0));
-        let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0000001, 0.9999999, -0.00000011920929, 1.0];
+        let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.9881021, 1.0210148, 0.011897922, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
 
         t.global.translate(vec3(-1.0, -1.0, 0.0));
-        assert_eq!(vec3(0.00000011920929, -0.00000011920929, -0.00000011920929), *t.global.get_translation());
+        assert_eq!(vec3(-0.011897922, 0.02101481, 0.011897922), *t.global.get_translation());
 
         //let m: &[f32; 16] = t.global.as_matrix().as_ref();
         //TODO: These assertions are *technically* true, but fail because of
