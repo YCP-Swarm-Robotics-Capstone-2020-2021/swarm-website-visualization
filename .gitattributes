@@ -1,3 +1,9 @@
 * text eol=lf
-*.obj linguist-vendored
+*.obj filter=lfs diff=lfs merge=lfs -text
 *.mtl linguist-vendored
+/resources/** linguist-vendored
+/resources/shaders/** linguist-vendored=false
+*.bpm filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
