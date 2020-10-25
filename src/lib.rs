@@ -103,28 +103,44 @@ fn init() -> Result<(), JsValue>
     let mut resource_loader = ResourceLoader::new();
 
     {
-        let request_handle = resource_loader.add_request("GET", "/Cube.obj")?;
+        let request_handle = resource_loader.add_request("GET", "/resources/models/robot.obj")?;
         clone!(resource_manager);
         resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
             {
-                resource_manager.borrow_mut().insert_with_name("/Cube.obj".to_string(), bytes);
+                resource_manager.borrow_mut().insert_with_name("robot.obj".to_string(), bytes);
             });
     }
     {
-        let request_handle = resource_loader.add_request("GET", "/shaders/texture_vert.glsl")?;
+        let request_handle = resource_loader.add_request("GET", "/resources/models/room.obj")?;
         clone!(resource_manager);
         resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
             {
-                resource_manager.borrow_mut().insert_with_name("/shaders/texture_vert.glsl".to_string(), bytes);
+                resource_manager.borrow_mut().insert_with_name("room.obj".to_string(), bytes);
+            });
+    }
+    {
+        let request_handle = resource_loader.add_request("GET", "/resources/images/tex_atlas.pbm")?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                resource_manager.borrow_mut().insert_with_name("tex_atlas.pbm".to_string(), bytes);
+            });
+    }
+    {
+        let request_handle = resource_loader.add_request("GET", "/resources/shaders/texture_vert.glsl")?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                resource_manager.borrow_mut().insert_with_name("texture_vert.glsl".to_string(), bytes);
             });
     }
     {
         {
-            let request_handle = resource_loader.add_request("GET", "/shaders/texture_frag.glsl")?;
+            let request_handle = resource_loader.add_request("GET", "/resources/shaders/texture_frag.glsl")?;
             clone!(resource_manager);
             resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
                 {
-                    resource_manager.borrow_mut().insert_with_name("/shaders/texture_frag.glsl".to_string(), bytes);
+                    resource_manager.borrow_mut().insert_with_name("texture_frag.glsl".to_string(), bytes);
                 });
         }
     }
@@ -152,69 +168,76 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
             let elem = document.get_element_by_id("canvas").expect("canvas handle");
             elem.dyn_into::<HtmlCanvasElement>()?
         };
+    let canvas_size: (u32, u32) = (canvas.width(), canvas.height());
 
     let context = new_context(&canvas)?;
+    let context_config_func = move |context: &Context|
+        {
+            context.viewport(0, 0, canvas_size.0 as i32, canvas_size.1 as i32);
+            context.pixel_storei(Context::UNPACK_ALIGNMENT, 1);
+            context.enable(Context::CULL_FACE);
+            context.enable(Context::DEPTH_TEST);
+        };
+    context_config_func(&context);
 
-    let cube_obj = resource_manager.borrow().get_by_name(&"/Cube.obj".to_string()).expect("cube obj resource").clone();
-    let mesh = Mesh::from_reader(&*cube_obj).expect("cube");
+    let robot_obj = resource_manager.borrow().get_by_name(&"robot.obj".to_string()).expect("robot obj resource").clone();
+    let robot_mesh = Mesh::from_reader(&*robot_obj).expect("robot mesh");
+    let room_obj = resource_manager.borrow().get_by_name(&"room.obj".to_string()).expect("room obj resource").clone();
+    let room_mesh = Mesh::from_reader(&*room_obj).expect("room mesh");
 
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
     let mut manager_ref = manager.borrow_mut();
 
-    // Texture for cubes
-    let texture_handle_t1 = manager_ref.insert_texture2d(
+
+    // Texture atlas
+    let tex_atlas_pbm = resource_manager.borrow().get_by_name(&"tex_atlas.pbm".to_string()).expect("texture atlas").clone();
+
+    let texture_atlas_handle = manager_ref.insert_texture2d(
         Texture2d::new(&context, Texture2dParams
         {
             target: Context::TEXTURE_2D,
-            format: Context::RGBA,
-            size: (1, 6),
+            internal_format: Context::RGB8,
+            format: Context::RGB,
+            size: (800, 400),
             wrap_type: Context::REPEAT,
-            filter_type: Context::NEAREST,
-            // data: vec![253.0 as u8, 94.0 as u8, 0, 255]
-            data: vec![
-                128,   0,   0, 255,
-                128,   0, 128, 255,
-                0, 128, 128, 255,
-                0,   0, 128, 255,
-                51, 153, 102, 255,
-                128, 128, 128, 255,
-            ]
+            filter_type: Context::LINEAR,
+            data: tex_atlas_pbm
         }).expect("texture")
     );
+    {
+        Texture2d::bind(&manager_ref, texture_atlas_handle);
+        manager_ref.get_texture2d(texture_atlas_handle).expect("atlas texture2d").setup_texture();
+    }
 
-    // VAO setup
-    let vert_arr_handle = manager_ref.insert_vertex_array(
-        VertexArray::new(&context).expect("vertex array")
-    );
-
-    let arr_buff_handle = manager_ref.insert_array_buffer(
-        ArrayBuffer::new(&context).expect("array buffer")
-    );
-
-    let elem_buff_handle = manager_ref.insert_element_array_buffer(
-        ElementArrayBuffer::new(&context).expect("element array buffer")
+    let robot_vao_handle = manager_ref.insert_vertex_array(
+        VertexArray::new(&context).expect("robot vertex array")
     );
 
     {
-        VertexArray::bind(&manager_ref, vert_arr_handle);
-        // Setup the vertex array buffer with the cube vertices
+        let arr_buff_handle = manager_ref.insert_array_buffer(
+            ArrayBuffer::new(&context).expect("robot array buffer")
+        );
+
+        let elem_buff_handle = manager_ref.insert_element_array_buffer(
+            ElementArrayBuffer::new(&context).expect("robot element array buffer")
+        );
+        VertexArray::bind(&manager_ref, robot_vao_handle);
+        // Setup the vertex array buffer with the robot vertices
         ArrayBuffer::bind(&manager_ref, arr_buff_handle);
         {
-            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("array buffer");
-            // arr_buff.buffer_data(&CUBE_VERTICES, Context::STATIC_DRAW);
-            arr_buff.buffer_data(&mesh.vertices, Context::STATIC_DRAW);
+            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("robot array buffer");
+            arr_buff.buffer_data(&robot_mesh.vertices, Context::STATIC_DRAW);
         }
-        // Setup the element array buffer with the cube indices
+        // Setup the element array buffer with the robot indices
         ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
         {
-            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("element array buffer");
-            // elem_arr_buff.buffer_data(&CUBE_INDICES, Context::STATIC_DRAW);
-            elem_arr_buff.buffer_data(&mesh.indices, Context::STATIC_DRAW);
+            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("robot element array buffer");
+            elem_arr_buff.buffer_data(&robot_mesh.indices, Context::STATIC_DRAW);
         }
         // Register the vertex and element array buffers with the VAO
         {
-            let mut vert_arr = manager_ref.get_mut_vertex_array(vert_arr_handle).expect("vertex array");
+            let mut vert_arr = manager_ref.get_mut_vertex_array(robot_vao_handle).expect("vertex array");
 
             let attribs = vec![
                 AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, position) as i32),
@@ -224,7 +247,49 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
             vert_arr.register_array_buffer(arr_buff_handle, Some(attribs));
             vert_arr.register_element_array_buffer(elem_buff_handle, None);
         }
-        VertexArray::unbind(&manager_ref, vert_arr_handle);
+        VertexArray::unbind(&manager_ref, robot_vao_handle);
+        ArrayBuffer::unbind(&manager_ref, arr_buff_handle);
+        ElementArrayBuffer::unbind(&manager_ref, elem_buff_handle);
+    }
+
+    let room_vao_handle = manager_ref.insert_vertex_array(
+        VertexArray::new(&context).expect("room vertex array")
+    );
+
+    {
+        let arr_buff_handle = manager_ref.insert_array_buffer(
+            ArrayBuffer::new(&context).expect("room array buffer")
+        );
+
+        let elem_buff_handle = manager_ref.insert_element_array_buffer(
+            ElementArrayBuffer::new(&context).expect("room element array buffer")
+        );
+        VertexArray::bind(&manager_ref, room_vao_handle);
+        // Setup the vertex array buffer with the room vertices
+        ArrayBuffer::bind(&manager_ref, arr_buff_handle);
+        {
+            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("room array buffer");
+            arr_buff.buffer_data(&room_mesh.vertices, Context::STATIC_DRAW);
+        }
+        // Setup the element array buffer with the room indices
+        ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
+        {
+            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("room element array buffer");
+            elem_arr_buff.buffer_data(&room_mesh.indices, Context::STATIC_DRAW);
+        }
+        // Register the vertex and element array buffers with the VAO
+        {
+            let mut vert_arr = manager_ref.get_mut_vertex_array(room_vao_handle).expect("room vertex array");
+
+            let attribs = vec![
+                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, position) as i32),
+                AttribPointer::without_defaults(1, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, normal) as i32),
+                AttribPointer::without_defaults(2, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, texcoord) as i32),
+            ];
+            vert_arr.register_array_buffer(arr_buff_handle, Some(attribs));
+            vert_arr.register_element_array_buffer(elem_buff_handle, None);
+        }
+        VertexArray::unbind(&manager_ref, room_vao_handle);
         ArrayBuffer::unbind(&manager_ref, arr_buff_handle);
         ElementArrayBuffer::unbind(&manager_ref, elem_buff_handle);
     }
@@ -247,30 +312,40 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
 
     let renderer = Renderer::new(&context.borrow(), &mut manager.borrow_mut(), &resource_manager.borrow()).expect("renderer");
 
-    // Setup render information for cube
-    let mut transformation_t1 = Transformation::new();
-    transformation_t1.global.scale(vec3(0.5, 0.5, 0.5));
-    let mut transformation_t2 = Transformation::new();
-    transformation_t2.global.scale(vec3(0.5, 0.5, 0.5));
-    transformation_t2.global.translate(vec3(-2.0, 0.0, 0.0));
-    let mut transformation_t3 = Transformation::new();
-    transformation_t3.global.scale(vec3(0.5, 0.5, 0.5));
-    transformation_t3.global.translate(vec3(2.0, 0.0, 0.0));
-    let t1 = RenderDto
+    let mut robot1_transform = Transformation::new();
+    robot1_transform.global.translate(vec3(3.0, 0.25, 2.5));
+    robot1_transform.local.rotate_angle_axis(Deg(90.0), vec3(0.0, 1.0, 0.0));
+    robot1_transform.local.translate(vec3(1.0, 0.0, 0.0));
+
+    let mut robot2_transform = Transformation::new();
+    robot2_transform.global.translate(vec3(-3.0, 0.25, -3.0));
+    robot2_transform.local.rotate_angle_axis(Deg(90.0), vec3(0.0, 1.0, 0.0));
+    robot2_transform.local.translate(vec3(1.0, 0.0, 0.0));
+
+    // Setup render information
+    let robot_renderable = RenderDto
     {
-        tex_handle: texture_handle_t1,
-        vert_arr_handle: vert_arr_handle,
-        num_indices: mesh.indices.len() as i32,
+        tex_handle: texture_atlas_handle,
+        vert_arr_handle: robot_vao_handle,
+        num_indices: robot_mesh.indices.len() as i32,
     };
 
-    let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 20.0f32);
+    let mut room_transform = Transformation::new();
+    let room_renderable = RenderDto
+    {
+        tex_handle: texture_atlas_handle,
+        vert_arr_handle: room_vao_handle,
+        num_indices: room_mesh.indices.len() as i32,
+    };
+
+    let perspective = cgmath::perspective(Deg(45.0f32), 1280.0f32/720.0f32, 0.1f32, 50.0f32);
     let camera = Rc::new(RefCell::new(
         Camera::from_eye(
             vec3(0.0, 0.0, 0.0),
-            vec3(0.0, 0.0, -1.0),
+            vec3(0.0, -0.5, -1.0),
             vec3(0.0, 1.0, 0.0)
         )));
-    camera.borrow_mut().move_cam_locked(vec3(-1.0, 0.0, 6.0));
+    camera.borrow_mut().move_cam_locked(vec3(0.0, 5.0, 9.0));
     {
         clone!(camera);
         let callback = move |event: web_sys::WheelEvent|
@@ -343,9 +418,8 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
                     // Perform any updates skipped due to missed frames
                     while accumulator >= delta_time
                     {
-                        transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), vec3(0.0, 0.0, 1.0));
-                        transformation_t2.local.rotate_angle_axis(Deg(20.0 * delta_time), vec3(1.0, 1.0, 1.0));
-                        transformation_t3.local.rotate_angle_axis(Deg( 5.0 * delta_time), vec3(1.0, 1.0, 0.0));
+                        robot1_transform.local.rotate_angle_axis(Deg(40.0 * delta_time), vec3(0.0, 1.0, 0.0));
+                        robot2_transform.local.rotate_angle_axis(Deg(-40.0 * delta_time), vec3(0.0, 1.0, 0.0));
 
                         accumulator -= delta_time;
                     }
@@ -360,22 +434,22 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
                         let nodes =
                             vec![
                                 Node(
-                                    &t1,
-                                    transformation_t1.matrix(),
-                                    //None
-                                    Some(vec![
-                                        Node(
-                                            &t1,
-                                            transformation_t2.matrix(),
-                                            None
-                                        ),
-                                    ])
-                                ),
-                                Node(
-                                    &t1,
-                                    transformation_t3.matrix(),
+                                    &robot_renderable,
+                                    robot1_transform.matrix(),
                                     None
                                 ),
+                                Node(
+                                    &robot_renderable,
+                                    robot2_transform.matrix(),
+                                    None
+                                ),
+                                Node(
+                                    &room_renderable,
+                                    room_transform.matrix(),
+                                    Some(vec![
+
+                                    ]),
+                                )
                             ];
 
                         renderer.render(&context, &manager.borrow(), perspective * camera.borrow().view_matrix(), &nodes);
@@ -416,13 +490,6 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
 
                 }
         };
-
-    let context_config_func = move |context: &Context|
-        {
-            context.enable(Context::CULL_FACE);
-            context.enable(Context::DEPTH_TEST);
-        };
-    context_config_func(&context.borrow());
 
     // Setup and start render loop
     let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func, context_config_func).expect("render_loop")));
