@@ -207,7 +207,7 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
     );
     {
         Texture2d::bind(&manager_ref, texture_atlas_handle);
-        manager_ref.get_texture2d(texture_atlas_handle).expect("atlas texture2d").setup_texture();
+        manager_ref.get_texture2d(texture_atlas_handle).expect("atlas texture2d").setup_texture().expect("texture2d setup");
     }
 
     let robot_vao_handle = manager_ref.insert_vertex_array(
