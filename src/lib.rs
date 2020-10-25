@@ -371,7 +371,7 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
         num_indices: room_mesh.indices.len() as i32,
     };
 
-    let perspective = cgmath::perspective(Deg(45.0f32), 1280.0f32/720.0f32, 0.1f32, 50.0f32);
+    let perspective = cgmath::perspective(Deg(45.0f32), canvas_size.0 as f32 / canvas_size.1 as f32, 0.1f32, 50.0f32);
     let camera = Rc::new(RefCell::new(
         Camera::from_eye(
             vec3(0.0, 0.0, 0.0),
