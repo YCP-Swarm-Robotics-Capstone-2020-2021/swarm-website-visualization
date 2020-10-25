@@ -3,3 +3,4 @@
 /build
 Cargo.lock
 /.idea
+*.mtl
