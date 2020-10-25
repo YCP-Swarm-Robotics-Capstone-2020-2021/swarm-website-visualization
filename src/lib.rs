@@ -84,8 +84,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[wasm_bindgen]
 extern
 {
-    /// Javascript `alert` function
-    fn alert(s: &str);
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
 }
@@ -96,14 +94,45 @@ fn log_s(s: String)
 }
 
 
-fn init() -> Result<(), JsValue>
+#[wasm_bindgen]
+pub fn init_visualization(canvas_id: &str, resource_dir: &str) -> Result<(), JsValue>
 {
+    let canvas_id = 
+        {
+            if canvas_id.is_empty()
+            {
+                crate::log("Warning: No canvas id provided, defaulting to \"canvas\"");
+                String::from("canvas")
+            }
+            else
+            {
+                canvas_id.to_owned()
+            }
+        };
+    let resource_dir = 
+        {
+            if resource_dir.is_empty()
+            {
+                crate::log("Warning: No resource directory provided, defaulting to '/'");
+                String::from("/")
+            }
+            else if resource_dir.ends_with("/")
+            {
+                resource_dir.to_owned()
+            }
+            else
+            {
+                resource_dir.to_owned() + "/"
+            }
+        };
+
     let resource_manager = Rc::new(RefCell::new(ResourceManager::new()));
 
     let mut resource_loader = ResourceLoader::new();
 
     {
-        let request_handle = resource_loader.add_request("GET", "/resources/models/robot.obj")?;
+        let resource = resource_dir.to_owned() + "models/robot.obj";
+        let request_handle = resource_loader.add_request("GET", resource)?;
         clone!(resource_manager);
         resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
             {
@@ -111,7 +140,8 @@ fn init() -> Result<(), JsValue>
             });
     }
     {
-        let request_handle = resource_loader.add_request("GET", "/resources/models/room.obj")?;
+        let resource = resource_dir.to_owned() + "models/room.obj";
+        let request_handle = resource_loader.add_request("GET", resource)?;
         clone!(resource_manager);
         resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
             {
@@ -119,7 +149,8 @@ fn init() -> Result<(), JsValue>
             });
     }
     {
-        let request_handle = resource_loader.add_request("GET", "/resources/images/tex_atlas.pbm")?;
+        let resource = resource_dir.to_owned() + "images/tex_atlas.pbm";
+        let request_handle = resource_loader.add_request("GET", resource)?;
         clone!(resource_manager);
         resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
             {
@@ -127,7 +158,8 @@ fn init() -> Result<(), JsValue>
             });
     }
     {
-        let request_handle = resource_loader.add_request("GET", "/resources/shaders/texture_vert.glsl")?;
+        let resource = resource_dir.to_owned() + "shaders/texture_vert.glsl";
+        let request_handle = resource_loader.add_request("GET", resource)?;
         clone!(resource_manager);
         resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
             {
@@ -136,7 +168,8 @@ fn init() -> Result<(), JsValue>
     }
     {
         {
-            let request_handle = resource_loader.add_request("GET", "/resources/shaders/texture_frag.glsl")?;
+            let resource = resource_dir.to_owned() + "shaders/texture_frag.glsl";
+            let request_handle = resource_loader.add_request("GET", resource)?;
             clone!(resource_manager);
             resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
                 {
@@ -149,7 +182,7 @@ fn init() -> Result<(), JsValue>
         clone!(resource_manager);
         resource_loader.set_onloadend(move ||
             {
-                start(resource_manager).expect("visualization start() func");
+                start(canvas_id, resource_dir, resource_manager).expect("visualization start() func");
             });
     }
     resource_loader.submit();
@@ -157,7 +190,7 @@ fn init() -> Result<(), JsValue>
     Ok(())
 }
 
-fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
+fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
 {
 
     // Get HTML element references
@@ -165,7 +198,7 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
     let document: Document = window.document().expect("document context");
     let canvas =
         {
-            let elem = document.get_element_by_id("canvas").expect("canvas handle");
+            let elem = document.get_element_by_id(&canvas_id).expect("canvas element exists");
             elem.dyn_into::<HtmlCanvasElement>()?
         };
     let canvas_size: (u32, u32) = (canvas.width(), canvas.height());
@@ -522,12 +555,10 @@ fn start(resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
 }
 
 #[wasm_bindgen(start)]
-pub fn start_visualization() -> Result<(), JsValue>
+pub fn main_function() -> Result<(), JsValue>
 {
     #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-
-    init()?;
 
     Ok(())
 }

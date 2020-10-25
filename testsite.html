@@ -24,10 +24,11 @@
                 ext.loseContext();
                 setTimeout(() => ext.restoreContext(), 1000);
             }
-            const { } = wasm_bindgen;
+            const { init_visualization } = wasm_bindgen;
             async function run()
             {
                 await wasm_bindgen('./build/swarm_website_visualization_bg.wasm');
+                init_visualization("canvas", "/resources");
             }
             run();
         </script>
