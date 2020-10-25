@@ -80,11 +80,11 @@ impl SubTransformation
     pub fn rotate_quat(&mut self, rotation: Quaternion<f32>)
     {
         // Apply rotation and normalize result
-        self.orientation = self.orientation * rotation;
+        self.orientation = self.orientation * rotation.normalize();
         self.orientation = self.orientation.normalize();
 
         // Apply rotation to position
-        self.translation = self.orientation * self.translation;
+        self.translation = rotation * self.translation;
 
         self.has_changed = true;
     }
