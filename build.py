@@ -23,7 +23,10 @@ print("Done")
 
 if not args.no_minjs:
     print("Minifying JS...")
+
+    js = open(JS_PATH_IN).read()
+
     minjs = open("./build/swarm_website_visualization.min.js", "w")
-    minjs.write(rjsmin.jsmin(JS_PATH_IN))
+    minjs.write(rjsmin.jsmin(js))
     minjs.close()
     print("Done")

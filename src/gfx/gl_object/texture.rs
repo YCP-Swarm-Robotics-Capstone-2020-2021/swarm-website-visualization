@@ -16,6 +16,7 @@ pub struct Texture2dParams
 {
     // Target texture, i.e. GL_TEXTURE_2D
     pub target: u32,
+    pub internal_format: u32,
     // Texture format, i.e. GL_BGR, GL_BGRA, etc
     pub format: u32,
     // Width & height of texture
@@ -50,29 +51,31 @@ impl Texture2d
             params
         };
 
-        texture.fill_texture()?;
-
         Ok(texture)
     }
 
-    fn fill_texture(&self) -> Result<(), GfxError>
+    pub fn setup_texture(&self) -> Result<(), GfxError>
     {
         self.context.bind_texture(self.params.target, Some(&self.internal));
+
         self.context.tex_parameteri(self.params.target, Context::TEXTURE_WRAP_S, self.params.wrap_type as i32);
         self.context.tex_parameteri(self.params.target, Context::TEXTURE_WRAP_T, self.params.wrap_type as i32);
         self.context.tex_parameteri(self.params.target, Context::TEXTURE_MIN_FILTER, self.params.filter_type as i32);
         self.context.tex_parameteri(self.params.target, Context::TEXTURE_MAG_FILTER, self.params.filter_type as i32);
+
         self.context.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_opt_u8_array(
             self.params.target,
             0,
-            self.params.format as i32,
+            self.params.internal_format as i32,
             self.params.size.0,
             self.params.size.1,
             0,
             self.params.format,
             Context::UNSIGNED_BYTE,
             Some(self.params.data.as_slice())
-        ).or_else(|_| Err(GfxError::TextureCreationError(gl_get_errors(&self.context).to_string())))
+        ).or_else(|_| Err(GfxError::TextureCreationError(gl_get_errors(&self.context).to_string())))?;
+
+        Ok(())
     }
 }
 
@@ -91,7 +94,10 @@ impl Reloadable for Texture2d
     {
         self.context = context.clone();
         self.internal = Texture2d::new_texture(&context)?;
-        self.fill_texture()
+        self.bind_internal();
+        self.setup_texture()?;
+        self.unbind_internal();
+        Ok(())
     }
 }
 

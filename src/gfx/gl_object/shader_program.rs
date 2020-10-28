@@ -224,10 +224,23 @@ impl Drop for ShaderProgram
     }
 }
 
-pub mod shader_source
+#[cfg(test)]
+mod tests
 {
-    #![allow(dead_code)]
+    inject_wasm_test_boilerplate!();
 
+    use crate::gfx::
+    {
+        gl_object::
+        {
+            shader_program::ShaderProgram,
+        },
+    };
+    use crate::gfx::gl_object::traits::Bindable;
+
+    // Embed shaders into test executable so that we can test ShaderProgram alone instead of
+    //      going through ResourceLoader. Since this is in a cfg(test) module, it won't be
+    //      included in the normal builds
     macro_rules! shader_source
     {
         ($path:expr) =>
@@ -235,9 +248,48 @@ pub mod shader_source
             include_str!(concat!(env!("CARGO_MANIFEST_DIR"), concat!("/", $path)))
         };
     }
-    pub const BASIC_VERT: &'static str = shader_source!("shaders/basic_vert.glsl");
-    pub const BASIC_FRAG: &'static str = shader_source!("shaders/basic_frag.glsl");
+    pub const BASIC_VERT: &'static str = shader_source!("/resources/shaders/basic_vert.glsl");
+    pub const BASIC_FRAG: &'static str = shader_source!("/resources/shaders/basic_frag.glsl");
 
-    pub const TEXTURE_VERT: &'static str = shader_source!("shaders/texture_vert.glsl");
-    pub const TEXTURE_FRAG: &'static str = shader_source!("shaders/texture_frag.glsl");
+    fn get_shader_program() -> (Context, ShaderProgram)
+    {
+        let context = get_context();
+        let shader_program = ShaderProgram::new(
+            &context,
+            Some(BASIC_VERT.to_string()),
+            Some(BASIC_FRAG.to_string())
+        ).expect("shader program");
+        shader_program.bind_internal();
+        (context, shader_program)
+    }
+
+    #[wasm_bindgen_test]
+    fn test_creation()
+    {
+        let (context, _shader_program) = get_shader_program();
+        assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
+    }
+
+    // TODO: Custom test shader so that these tests can pass
+    //       Or would using existing shaders be could so the
+    //       shaders themselves can be tested too?
+    #[wasm_bindgen_test]
+    fn test_block_bindings()
+    {
+        //let (context, mut shader_program) = get_shader_program();
+
+        // TODO:
+        //shader_program.add_uniform_block_binding("fake_block", 0).unwrap();
+        //assert_eq!(shader_program.block_bindings[0], Some(String::from("fake_block")))
+    }
+
+    #[wasm_bindgen_test]
+    fn test_set_uniform()
+    {
+        //let (context, mut shader_program) = get_shader_program();
+
+        // TODO:
+        //shader_program.set_uniform_i32("fake_uniform", &[0]).unwrap();
+        //assert_eq!(GfxError::GlErrors(vec![GlError::NoError]), gl_get_errors(&context));
+    }
 }

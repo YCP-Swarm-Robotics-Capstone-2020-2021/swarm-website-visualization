@@ -43,13 +43,13 @@ impl SubTransformation
     }
 
     #[allow(dead_code)]
-    pub fn scale(&mut self, scale: &Vector3<f32>)
+    pub fn scale(&mut self, scale: Vector3<f32>)
     {
         // Multiply in the scale factor
-        self.scale.mul_assign_element_wise(*scale);
+        self.scale.mul_assign_element_wise(scale);
 
         // Scale the current position by the scale factor
-        self.translation.mul_assign_element_wise(*scale);
+        self.translation.mul_assign_element_wise(scale);
 
         self.has_changed = true;
     }
@@ -77,14 +77,14 @@ impl SubTransformation
     /// Rotate orientation with a quaternion
     /// `rotation` MUST be normalized
     #[allow(dead_code)]
-    pub fn rotate_quat(&mut self, rotation: &Quaternion<f32>)
+    pub fn rotate_quat(&mut self, rotation: Quaternion<f32>)
     {
         // Apply rotation and normalize result
-        self.orientation = self.orientation * rotation;
+        self.orientation = self.orientation * rotation.normalize();
         self.orientation = self.orientation.normalize();
 
         // Apply rotation to position
-        self.translation = self.orientation * self.translation;
+        self.translation = rotation * self.translation;
 
         self.has_changed = true;
     }
@@ -92,9 +92,9 @@ impl SubTransformation
     /// Rotate orientation with an angle (in radians) and axis of rotation
     /// `axis` MUST be normalized
     #[allow(dead_code)]
-    pub fn rotate_angle_axis<A: Into<Rad<f32>>>(&mut self, angle: A, axis: &Vector3<f32>)
+    pub fn rotate_angle_axis<A: Into<Rad<f32>>>(&mut self, angle: A, axis: Vector3<f32>)
     {
-        self.rotate_quat(&Quaternion::from_axis_angle(*axis, angle))
+        self.rotate_quat(Quaternion::from_axis_angle(axis, angle))
     }
 
     /// Set orientation with a quaternion
@@ -115,9 +115,9 @@ impl SubTransformation
     /// Set orientation with an angle (in radians) and axis of rotation
     /// `axis` MUST be normalized
     #[allow(dead_code)]
-    pub fn set_orientation_angle_axis<A: Into<Rad<f32>>>(&mut self, angle: A, axis: &Vector3<f32>)
+    pub fn set_orientation_angle_axis<A: Into<Rad<f32>>>(&mut self, angle: A, axis: Vector3<f32>)
     {
-        self.set_orientation_quat(Quaternion::from_axis_angle(*axis, angle))
+        self.set_orientation_quat(Quaternion::from_axis_angle(axis, angle))
     }
 
     #[allow(dead_code)]
@@ -127,9 +127,9 @@ impl SubTransformation
     }
 
     #[allow(dead_code)]
-    pub fn translate(&mut self, translation: &Vector3<f32>)
+    pub fn translate(&mut self, translation: Vector3<f32>)
     {
-        self.translation += *translation;
+        self.translation += translation;
 
         self.has_changed = true;
     }
@@ -146,6 +146,12 @@ impl SubTransformation
     pub fn get_translation(&self) -> &Vector3<f32>
     {
         &self.translation
+    }
+
+    #[allow(dead_code)]
+    pub fn has_changed(&self) -> bool
+    {
+        self.has_changed
     }
 
     /// Assembles the transformation components into a matrix
@@ -241,6 +247,12 @@ impl Transformation
     }
 
     #[allow(dead_code)]
+    pub fn has_changed(&self) -> bool
+    {
+        self.global.has_changed || self.local.has_changed
+    }
+
+    #[allow(dead_code)]
     pub fn matrix(&mut self) -> &Matrix4<f32>
     {
         if self.global.has_changed || self.local.has_changed
@@ -262,7 +274,6 @@ impl Transformation
 mod tests
 {
     use crate::math::transform::*;
-    use cgmath::prelude::*;
     use cgmath::Deg;
 
     const I: [f32; 16] =
@@ -300,7 +311,7 @@ mod tests
     fn reset()
     {
         let mut t = Transformation::new();
-        t.global.translate(&vec3(1.0, 1.0, 1.0));
+        t.global.translate(vec3(1.0, 1.0, 1.0));
 
         t.reset();
         let m: &[f32; 16] = t.matrix().as_ref();
@@ -312,7 +323,7 @@ mod tests
         let mut t = Transformation::new();
 
         // Test scaling on I
-        t.global.scale(&vec3(2.0, 2.0, 2.0));
+        t.global.scale(vec3(2.0, 2.0, 2.0));
         let expected: [f32; 16] = [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
@@ -320,8 +331,8 @@ mod tests
         t.reset();
 
         // Test scaling on transformation with translations
-        t.global.translate(&vec3(1.0, 0.0, 1.0));
-        t.global.scale(&vec3(2.0, 2.0, 2.0));
+        t.global.translate(vec3(1.0, 0.0, 1.0));
+        t.global.scale(vec3(2.0, 2.0, 2.0));
         let expected: [f32; 16] = [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 2.0, 0.0, 2.0, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
@@ -334,8 +345,8 @@ mod tests
         assert_eq!(vec3(1.0, 0.0, 1.0), *t.global.get_translation());
 
         // Test scaling on transformation with orientation
-        t.global.rotate_angle_axis(Deg(1.0), &vec3(0.0, 1.0, 0.0));
-        t.global.scale(&vec3(2.0, 1.0, 2.0));
+        t.global.rotate_angle_axis(Deg(1.0), vec3(0.0, 1.0, 0.0));
+        t.global.scale(vec3(2.0, 1.0, 2.0));
         let expected: [f32; 16] = [1.9996954, 0.0, -0.03490481, 0.0, 0.0, 1.0, 0.0, 0.0, 0.03490481, 0.0, 1.9996954, 0.0, 2.0346003, 0.0, 1.9647906, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
@@ -355,29 +366,29 @@ mod tests
         let mut t = Transformation::new();
 
         // Test orientation on I
-        t.global.rotate_angle_axis(Deg(1.0), &vec3(1.0, 0.0, 1.0));
-        let expected: [f32; 16] = [0.9998477, 0.01745108, 0.00015229327, 0.0, -0.01745108, 0.9996954, 0.01745108, 0.0, 0.00015229327, -0.01745108, 0.9998477, 0.0, 0.0, 0.0, 0.0, 1.0];
+        t.global.rotate_angle_axis(Deg(1.0), vec3(1.0, 0.0, 1.0));
+        let expected: [f32; 16] =  [0.9998477, 0.01745108, 0.00015229327, 0.0, -0.01745108, 0.9996954, 0.01745108, 0.0, 0.00015229327, -0.01745108, 0.9998477, 0.0, 0.0, 0.0, 0.0, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
 
         t.reset();
 
         // Test orientation on transformation with translation
-        t.global.translate(&vec3(1.0, 1.0, 0.0));
-        t.global.rotate_angle_axis(Deg(23.0), &vec3(1.0, 0.0, 1.0));
-        let expected: [f32; 16] = [0.9235438, 0.3757942, 0.0764562, 0.0, -0.3757942, 0.8470876, 0.3757942, 0.0, 0.0764562, -0.3757942, 0.9235438, 0.0, 0.5477496, 1.2228818, 0.45225042, 1.0];
+        t.global.translate(vec3(1.0, 1.0, 0.0));
+        t.global.rotate_angle_axis(Deg(23.0), vec3(1.0, 0.0, 1.0));
+        let expected: [f32; 16] = [0.9235438, 0.37579432, 0.07645622, 0.0, -0.37579432, 0.8470876, 0.37579432, 0.0, 0.07645622, -0.37579432, 0.9235438, 0.0, 0.5297738, 1.2317408, 0.47022623, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
 
-        t.global.set_orientation_angle_axis(Deg(0.0), &vec3(0.0, 0.0, 0.0));
-        let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0000001, 0.9999999, -0.00000011920929, 1.0];
+        t.global.set_orientation_angle_axis(Deg(0.0), vec3(0.0, 0.0, 0.0));
+        let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.9881021, 1.0210148, 0.011897922, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);
 
-        t.global.translate(&vec3(-1.0, -1.0, 0.0));
-        assert_eq!(vec3(0.00000011920929, -0.00000011920929, -0.00000011920929), *t.global.get_translation());
+        t.global.translate(vec3(-1.0, -1.0, 0.0));
+        assert_eq!(vec3(-0.011897922, 0.02101481, 0.011897922), *t.global.get_translation());
 
-        let m: &[f32; 16] = t.global.as_matrix().as_ref();
+        //let m: &[f32; 16] = t.global.as_matrix().as_ref();
         //TODO: These assertions are *technically* true, but fail because of
         // rounding precision errors
         //assert_eq!(I, *m);
@@ -388,7 +399,7 @@ mod tests
     {
         let mut t = Transformation::new();
 
-        t.global.translate(&vec3(1.0, 0.0, 3.0));
+        t.global.translate(vec3(1.0, 0.0, 3.0));
         let expected: [f32; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 3.0, 1.0];
         let m: &[f32; 16] = t.global.as_matrix().as_ref();
         assert_eq!(expected, *m);

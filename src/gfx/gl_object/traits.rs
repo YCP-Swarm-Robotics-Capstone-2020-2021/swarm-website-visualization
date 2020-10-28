@@ -17,8 +17,8 @@ pub trait Reloadable
 
 pub trait GlObject: Bindable + Reloadable + Drop
 {
-    fn bind(manager: &mut GlObjectManager, handle: GlObjectHandle) where Self: Sized;
-    fn unbind(manager: &mut GlObjectManager, handle: GlObjectHandle) where Self: Sized;
+    fn bind(manager: &GlObjectManager, handle: GlObjectHandle) where Self: Sized;
+    fn unbind(manager: &GlObjectManager, handle: GlObjectHandle) where Self: Sized;
 }
 
 macro_rules! impl_globject
@@ -28,12 +28,12 @@ macro_rules! impl_globject
     {
         impl crate::gfx::gl_object::traits::GlObject for $implementor
         {
-            fn bind(manager: &mut crate::gfx::gl_object::manager::GlObjectManager, handle: crate::gfx::gl_object::manager::GlObjectHandle) where Self: Sized
+            fn bind(manager: &crate::gfx::gl_object::manager::GlObjectManager, handle: crate::gfx::gl_object::manager::GlObjectHandle) where Self: Sized
             {
                 manager.[<bind_ $implementor:snake>](handle, true).expect(concat!(stringify!($implementor), " bound"));
             }
 
-            fn unbind(manager: &mut crate::gfx::gl_object::manager::GlObjectManager, handle: crate::gfx::gl_object::manager::GlObjectHandle) where Self: Sized
+            fn unbind(manager: &crate::gfx::gl_object::manager::GlObjectManager, handle: crate::gfx::gl_object::manager::GlObjectHandle) where Self: Sized
             {
                 manager.[<bind_ $implementor:snake>](handle, false).expect(concat!(stringify!($implementor), " unbound"));
             }
