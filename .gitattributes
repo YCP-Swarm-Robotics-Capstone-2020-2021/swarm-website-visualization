@@ -1,4 +1,7 @@
 * text eol=lf
+*.jpg binary
+*.png binary
+*.pbm binary
 *.obj filter=lfs diff=lfs merge=lfs -text
 *.mtl linguist-vendored
 /resources/** linguist-vendored
