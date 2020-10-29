@@ -108,7 +108,7 @@ impl RenderLoop
                         // Update context
                         *context = new_context(&canvas).unwrap();
 
-                        (context_config.borrow_mut())(&context);
+                        (&mut *context_config.borrow_mut())(&context);
 
                         // Recreate and reload all given GlObjects with new context
                         globject_manager.borrow_mut().reload_objects(&context);
