@@ -32,6 +32,7 @@ mod gfx;
 mod input;
 mod math;
 mod resource;
+mod script;
 
 use crate::
 {
@@ -559,6 +560,9 @@ pub fn main_function() -> Result<(), JsValue>
 {
     #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+    let mut s = crate::script::Script::new();
+    s.read("");
 
     Ok(())
 }
