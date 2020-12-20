@@ -178,6 +178,18 @@ pub fn init_visualization(canvas_id: &str, resource_dir: &str) -> Result<(), JsV
                 });
         }
     }
+    {
+        let resource = resource_dir.to_owned() + "scripts/LOG_Narwhal_1_12_2020_____12_55_43.alog.script";
+        let request_handle = resource_loader.add_request("GET", resource)?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                //resource_manager.borrow_mut().insert_with_name("script".to_string(), bytes);
+                let mut script = script::Script::new();
+                let str = String::from_utf8(bytes).expect("script as string");
+                script.read(&str);
+            });
+    }
 
     {
         clone!(resource_manager);
@@ -560,9 +572,6 @@ pub fn main_function() -> Result<(), JsValue>
 {
     #[cfg(feature="debug")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-
-    let mut s = crate::script::Script::new();
-    s.read("");
 
     Ok(())
 }
