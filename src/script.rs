@@ -11,57 +11,24 @@ use serde::{Serialize, Deserialize};
 pub struct RobotData
 {
     pub id: String,
+    #[serde(rename(deserialize="x"))]
     pub x_pos: f32,
+    #[serde(rename(deserialize="y"))]
     pub y_pos: f32,
-    pub attitude: f32,
+    #[serde(rename(deserialize="r"))]
+    pub rotation: f32,
+    #[serde(rename(deserialize="s"))]
     pub current_speed: f32
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct Timestamp
-{
-    pub timestamp: f32,
-    pub robots: Vec<RobotData>,
-}
-impl Ord for Timestamp
-{
-    fn cmp(&self, other: &Self) -> Ordering
-    {
-        self.timestamp.to_bits().cmp(&other.timestamp.to_bits())
-    }
-}
-impl PartialOrd for Timestamp
-{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>
-    {
-        Some(self.cmp(other))
-    }
-}
-impl PartialEq for Timestamp
-{
-    fn eq(&self, other: &Self) -> bool
-    {
-        approx_eq!(f32, self.timestamp, other.timestamp)
-    }
-}
-impl Eq for Timestamp {}
-
-#[derive(Debug, Default, Clone)]
-pub struct StepData
-{
-    // Incremental timestamp used while traversing the script
-    pub step: f32,
-    pub timestamps: Vec<Timestamp>,
-}
-
-// If this changes, the way that `nearest_step` is calculated in `read` needs to be changed too
-const DEFAULT_STEP_SIZE: f32 = 0.1;
 type BHD = BuildHasherDefault<XxHash32>;
 #[derive(Debug, Clone)]
 pub struct Script
 {
-    num_steps: f32,
-    current_step: f32,
+    timestamp_increment: f32,
+    timestamp_rounding: f32,
+    last_timestamp: f32,
+    current_timestamp: f32,
 
     // The hashmap key is 0.0 - X, in `DEFAULT_STEP_SIZE` increments
     //      This is so that if a specific time is requested (i.e. in the video playback scrubber)
@@ -70,7 +37,7 @@ pub struct Script
     //      i.e. if DEFAULT_STEP is 0.1
     //          if 0.541 is requested, 0.5 is accessed, then the entry is searched for 0.541
     // Key is an f32 as bits (f32::to_bits()) so that the timestamps can be hashable
-    steps: HashMap<u32, StepData, BHD>,
+    timestamps: HashMap<u32, Vec<RobotData>, BHD>,
 }
 
 impl Script
@@ -79,9 +46,11 @@ impl Script
     {
         Script
         {
-            num_steps: 0.0,
-            current_step: 0.0,
-            steps: Default::default()
+            timestamp_increment: 0.0,
+            timestamp_rounding: 0.0,
+            last_timestamp: 0.0,
+            current_timestamp: 0.0,
+            timestamps: Default::default()
         }
     }
 
@@ -91,39 +60,26 @@ impl Script
         #[derive(Debug, Clone, Serialize, Deserialize)]
         struct JsonData
         {
-            first_timestamp: f32,
-            last_timestamp: f32,
-            timestamps: HashMap<String, Vec<RobotData>>
+            timeinc: f32,
+            timeround: f32,
+            timeend: f32,
+            timestamps: HashMap<String, Vec<RobotData>, BHD>
         }
 
         let parsed: JsonData = serde_json::from_str(script).unwrap();
 
-        for (timestamp, robots) in parsed.timestamps
+        self.timestamp_increment = parsed.timeinc;
+        self.timestamp_rounding = parsed.timeround;
+        self.last_timestamp = parsed.timeend;
+
+        for(timestamp, robots) in parsed.timestamps
         {
             let timestamp = timestamp.parse::<f32>()?;
-
-            // Round to 1 decimal place
-            let nearest_step = (timestamp * 10.0).round() / 10.0;
-            let nearest_step_bits = nearest_step.to_bits();
-
-                // Add a new empty vec if the key doesn't exist
-            if !self.steps.contains_key(&nearest_step_bits)
-            {
-                self.steps.insert(nearest_step_bits, Default::default());
-            }
-
-            // Append the timestamp and data to the relevant vec
-            let step_data = self.steps.get_mut(&nearest_step_bits).expect("key should exist");
-            step_data.step = nearest_step;
-            step_data.timestamps.push(Timestamp { timestamp, robots });
+            self.timestamps.insert(timestamp.to_bits(), robots);
         }
 
-        for (_, step_data) in &mut self.steps
-        {
-            step_data.timestamps.sort();
-        }
-
-        crate::log_s(format!("{:?}", self.steps.get(&1.0f32.to_bits())));
+        crate::log_s(format!("{:?}", self));
+        crate::log_s(format!("{:?}", self.timestamps.get(&2.0f32.to_bits())));
 
         Ok(())
     }
