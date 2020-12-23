@@ -179,15 +179,12 @@ pub fn init_visualization(canvas_id: &str, resource_dir: &str) -> Result<(), JsV
         }
     }
     {
-        let resource = resource_dir.to_owned() + "scripts/LOG_Narwhal_1_12_2020_____12_55_43.alog.script";
+        let resource = resource_dir.to_owned() + "scripts/test_script.script";
         let request_handle = resource_loader.add_request("GET", resource)?;
         clone!(resource_manager);
         resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
             {
-                //resource_manager.borrow_mut().insert_with_name("script".to_string(), bytes);
-                let mut script = script::Script::new();
-                let str = String::from_utf8(bytes).expect("script as string");
-                script.read(&str);
+                resource_manager.borrow_mut().insert_with_name("script".to_string(), bytes);
             });
     }
 
@@ -438,6 +435,10 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
 
     let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
 
+    let mut script = script::Script::new();
+    let str = String::from_utf8(resource_manager.borrow().get_by_name(&"script".to_string()).expect("script file").to_owned()).expect("script as string");
+    script.read(&str);
+
     let render_func =
         {
             clone!(context, manager, camera);
@@ -464,9 +465,14 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
                     // Perform any updates skipped due to missed frames
                     while accumulator >= delta_time
                     {
-                        robot1_transform.local.rotate_angle_axis(Deg(40.0 * delta_time), vec3(0.0, 1.0, 0.0));
-                        robot2_transform.local.rotate_angle_axis(Deg(-40.0 * delta_time), vec3(0.0, 1.0, 0.0));
+                        //robot1_transform.local.rotate_angle_axis(Deg(40.0 * delta_time), vec3(0.0, 1.0, 0.0));
+                        //robot2_transform.local.rotate_angle_axis(Deg(-40.0 * delta_time), vec3(0.0, 1.0, 0.0));
 
+                        script.advance();
+                        if script.is_done()
+                        {
+                            script.reset();
+                        }
                         accumulator -= delta_time;
                     }
 
@@ -476,19 +482,11 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
                         context.clear_color(0.0, 0.0, 0.0, 1.0);
                         context.clear(Context::COLOR_BUFFER_BIT | Context::DEPTH_BUFFER_BIT);
 
+
+
                         // Setup scene graph
-                        let nodes =
+                        let mut nodes =
                             vec![
-                                Node(
-                                    &robot_renderable,
-                                    robot1_transform.matrix(),
-                                    None
-                                ),
-                                Node(
-                                    &robot_renderable,
-                                    robot2_transform.matrix(),
-                                    None
-                                ),
                                 Node(
                                     &room_renderable,
                                     room_transform.matrix(),
@@ -497,6 +495,40 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
                                     ]),
                                 )
                             ];
+
+                        let script_data = script.current_data().expect("data available");
+                        let mut d1 = false;
+                        let mut d2 = false;
+                        for data in script_data
+                        {
+                            if data.id == "Dolphin0"
+                            {
+                                robot1_transform.global.set_translation(vec3(data.x_pos, 0.25, data.y_pos));
+                                d1 = true;
+                            }
+                            if data.id == "Dolphin1"
+                            {
+                                robot2_transform.global.set_translation(vec3(data.x_pos, 0.25, data.y_pos));
+                                d2 = true;
+                            }
+                        }
+
+                        if d1
+                        {
+                            nodes.push(Node(
+                                &robot_renderable,
+                                robot1_transform.matrix(),
+                                None
+                            ));
+                        }
+                        if d2
+                        {
+                            nodes.push(Node(
+                                    &robot_renderable,
+                                    robot2_transform.matrix(),
+                                    None
+                                ));
+                        }
 
                         renderer.render(&context, &manager.borrow(), perspective * camera.borrow().view_matrix(), &nodes);
                     }
