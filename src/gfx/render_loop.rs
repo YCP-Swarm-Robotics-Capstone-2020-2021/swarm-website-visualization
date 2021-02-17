@@ -41,20 +41,22 @@ pub struct RenderLoop
     // request_animation_frame() callback that calls given render func
     raf_callback: Rc<RefCell<Option<Closure<dyn FnMut()>>>>,
     // handle from each request_animation_frame() call
-    raf_handle: Rc<Cell<i32>>
+    raf_handle: Rc<Cell<i32>>,
+    context_config: Rc<RefCell<Box<dyn FnMut(&Context)>>>
 }
 
 impl RenderLoop
 {
     /// Initialize a new `RenderLoop`
-    /// `RenderLoop` will call `GlObject::recreate_and_reload()` for each item in
-    /// `globjects` in the even of a context loss
-    pub fn init<T: 'static + FnMut()>(
+    /// `RenderLoop` will call `GlObjectManager`'s reload function in the event of a context loss
+    /// `context_config` is a function to setup/configure the context before the reload occurs
+    pub fn init<F: 'static + FnMut(), FC: 'static + FnMut(&Context)>(
         window: &Window,
         canvas: &HtmlCanvasElement,
         context: &Rc<RefCell<Context>>,
         globject_manager: &Rc<RefCell<GlObjectManager>>,
-        render_func: T
+        render_func: F,
+        context_config: FC,
     ) -> Result<RenderLoop, GfxError>
     {
         let mut render_loop = RenderLoop
@@ -69,6 +71,7 @@ impl RenderLoop
             running: Rc::new(Cell::new(false)),
             raf_callback: Rc::new(RefCell::new(None)),
             raf_handle: Rc::new(Cell::new(-1)),
+            context_config: Rc::new(RefCell::new(Box::new(context_config))),
         };
         render_loop.init_on_context_lost();
         render_loop.init_on_context_restored();
@@ -98,15 +101,16 @@ impl RenderLoop
     {
         let callback =
             {
-                clone!(self.canvas, self.context, self.valid_context, self.globject_manager);
+                clone!(self.canvas, self.context, self.valid_context, self.globject_manager, self.context_config);
                 move |_event: web_sys::WebGlContextEvent|
                     {
                         let mut context = context.borrow_mut();
                         // Update context
                         *context = new_context(&canvas).unwrap();
 
-                        // Recreate and reload all given GlObjects with new context
+                        (&mut *context_config.borrow_mut())(&context);
 
+                        // Recreate and reload all given GlObjects with new context
                         globject_manager.borrow_mut().reload_objects(&context);
 
                         // Print out any webgl errors

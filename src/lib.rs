@@ -22,11 +22,16 @@ use std::
 #[macro_use]
 mod redeclare;
 #[macro_use]
+mod test_util;
+#[macro_use]
 extern crate memoffset;
+#[macro_use]
+extern crate float_cmp;
 
 mod gfx;
 mod input;
 mod math;
+mod resource;
 
 use crate::
 {
@@ -34,16 +39,16 @@ use crate::
     {
         Context,
         new_context,
+        mesh::{Vertex, Mesh},
         render_loop::RenderLoop,
         renderer::
         {
-            renderer2d::
+            renderer::
             {
                 RenderDto,
                 Node,
-                Renderer2D,
+                Renderer,
             },
-            vertex::Vertex,
         },
         gl_object::
         {
@@ -64,6 +69,11 @@ use crate::
         states::{InputState, InputStateListener},
     },
     math::transform::{Transformation},
+    resource::
+    {
+        loader::{ResourceLoader, OnloadCallbackArgs,},
+        manager::ResourceManager,
+    },
 };
 use cgmath::{vec3, Deg};
 
@@ -74,8 +84,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[wasm_bindgen]
 extern
 {
-    /// Javascript `alert` function
-    fn alert(s: &str);
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
 }
@@ -85,150 +93,237 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
-#[allow(dead_code)]
-const TRIANGLE_VERTICES: [Vertex; 3] =
-    [
-        Vertex { pos: [-0.5, -0.5, 1.0], tex: [0.0, 0.0] },
-        Vertex { pos: [ 0.5, -0.5, 1.0], tex: [1.0, 0.0] },
-        Vertex { pos: [ 0.0,  0.5, 1.0], tex: [0.5, 1.0] }
-    ];
-#[allow(dead_code)]
-const TRIANGLE_INDICES: [u32; 3] = [0, 1, 2];
 
-const CUBE_VERTICES: [Vertex; 24] =
-    [
-        // Back face
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [0.0/6.0, 1.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [0.0/6.0, 0.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [1.0/6.0, 0.0/6.0] }, /* Bottom Right*/
 
-        // Front face
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [1.0/6.0, 2.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [1.0/6.0, 1.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [2.0/6.0, 1.0/6.0] }, /* Bottom Right*/
-
-        // Left face
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [2.0/6.0, 3.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [2.0/6.0, 2.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [3.0/6.0, 2.0/6.0] }, /* Bottom Right*/
-
-        // Right face
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [3.0/6.0, 4.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [3.0/6.0, 3.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [4.0/6.0, 3.0/6.0] }, /* Bottom Right*/
-
-        // Top face
-        Vertex{ pos: [-0.5,  0.5, -0.5], tex: [4.0/6.0, 5.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5,  0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5,  0.5,  0.5], tex: [4.0/6.0, 4.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5,  0.5,  0.5], tex: [5.0/6.0, 4.0/6.0] }, /* Bottom Right*/
-
-        // Bottom face
-        Vertex{ pos: [-0.5, -0.5,  0.5], tex: [5.0/6.0, 6.0/6.0] }, /* Top Left    */
-        Vertex{ pos: [ 0.5, -0.5,  0.5], tex: [6.0/6.0, 6.0/6.0] }, /* Top Right   */
-        Vertex{ pos: [-0.5, -0.5, -0.5], tex: [5.0/6.0, 5.0/6.0] }, /* Bottom Left */
-        Vertex{ pos: [ 0.5, -0.5, -0.5], tex: [6.0/6.0, 5.0/6.0] }, /* Bottom Right*/
-    ];
-const CUBE_INDICES: [u32; 36] =
-    [
-         1,  0,  2,  2,  3,  1,
-         5,  4,  6,  6,  7,  5,
-         9,  8, 10, 10, 11,  9,
-        13, 12, 14, 14, 15, 13,
-        17, 16, 18, 18, 19, 17,
-        21, 20, 22, 22, 23, 21
-    ];
-
-#[wasm_bindgen(start)]
-pub fn main() -> Result<(), JsValue>
+#[wasm_bindgen]
+pub fn init_visualization(canvas_id: &str, resource_dir: &str) -> Result<(), JsValue>
 {
-    // Allow panics to print to javascript console if debug build
-    #[cfg(feature="debug")]
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    let canvas_id = 
+        {
+            if canvas_id.is_empty()
+            {
+                crate::log("Warning: No canvas id provided, defaulting to \"canvas\"");
+                String::from("canvas")
+            }
+            else
+            {
+                canvas_id.to_owned()
+            }
+        };
+    let resource_dir = 
+        {
+            if resource_dir.is_empty()
+            {
+                crate::log("Warning: No resource directory provided, defaulting to '/'");
+                String::from("/")
+            }
+            else if resource_dir.ends_with("/")
+            {
+                resource_dir.to_owned()
+            }
+            else
+            {
+                resource_dir.to_owned() + "/"
+            }
+        };
+
+    let resource_manager = Rc::new(RefCell::new(ResourceManager::new()));
+
+    let mut resource_loader = ResourceLoader::new();
+
+    {
+        let resource = resource_dir.to_owned() + "models/robot.obj";
+        let request_handle = resource_loader.add_request("GET", resource)?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                resource_manager.borrow_mut().insert_with_name("robot.obj".to_string(), bytes);
+            });
+    }
+    {
+        let resource = resource_dir.to_owned() + "models/room.obj";
+        let request_handle = resource_loader.add_request("GET", resource)?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                resource_manager.borrow_mut().insert_with_name("room.obj".to_string(), bytes);
+            });
+    }
+    {
+        let resource = resource_dir.to_owned() + "images/tex_atlas.pbm";
+        let request_handle = resource_loader.add_request("GET", resource)?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                resource_manager.borrow_mut().insert_with_name("tex_atlas.pbm".to_string(), bytes);
+            });
+    }
+    {
+        let resource = resource_dir.to_owned() + "shaders/texture_vert.glsl";
+        let request_handle = resource_loader.add_request("GET", resource)?;
+        clone!(resource_manager);
+        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+            {
+                resource_manager.borrow_mut().insert_with_name("texture_vert.glsl".to_string(), bytes);
+            });
+    }
+    {
+        {
+            let resource = resource_dir.to_owned() + "shaders/texture_frag.glsl";
+            let request_handle = resource_loader.add_request("GET", resource)?;
+            clone!(resource_manager);
+            resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
+                {
+                    resource_manager.borrow_mut().insert_with_name("texture_frag.glsl".to_string(), bytes);
+                });
+        }
+    }
+
+    {
+        clone!(resource_manager);
+        resource_loader.set_onloadend(move ||
+            {
+                start(canvas_id, resource_dir, resource_manager).expect("visualization start() func");
+            });
+    }
+    resource_loader.submit();
+
+    Ok(())
+}
+
+fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
+{
 
     // Get HTML element references
     let window: Window = window().expect("window context");
     let document: Document = window.document().expect("document context");
     let canvas =
         {
-            let elem = document.get_element_by_id("canvas").expect("canvas handle");
+            let elem = document.get_element_by_id(&canvas_id).expect("canvas element exists");
             elem.dyn_into::<HtmlCanvasElement>()?
         };
-    let context = new_context(&canvas)?;
+    let canvas_size: (u32, u32) = (canvas.width(), canvas.height());
 
-    context.enable(Context::CULL_FACE);
-    context.enable(Context::DEPTH_TEST);
+    let context = new_context(&canvas)?;
+    let context_config_func = move |context: &Context|
+        {
+            context.viewport(0, 0, canvas_size.0 as i32, canvas_size.1 as i32);
+            context.pixel_storei(Context::UNPACK_ALIGNMENT, 1);
+            context.enable(Context::CULL_FACE);
+            context.enable(Context::DEPTH_TEST);
+        };
+    context_config_func(&context);
+
+    let robot_obj = resource_manager.borrow().get_by_name(&"robot.obj".to_string()).expect("robot obj resource").clone();
+    let robot_mesh = Mesh::from_reader(&*robot_obj).expect("robot mesh");
+    let room_obj = resource_manager.borrow().get_by_name(&"room.obj".to_string()).expect("room obj resource").clone();
+    let room_mesh = Mesh::from_reader(&*room_obj).expect("room mesh");
 
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
     let mut manager_ref = manager.borrow_mut();
 
-    // Texture for triangle 1
-    let texture_handle_t1 = manager_ref.insert_texture2d(
+
+    // Texture atlas
+    let tex_atlas_pbm = resource_manager.borrow().get_by_name(&"tex_atlas.pbm".to_string()).expect("texture atlas").clone();
+
+    let texture_atlas_handle = manager_ref.insert_texture2d(
         Texture2d::new(&context, Texture2dParams
         {
             target: Context::TEXTURE_2D,
-            format: Context::RGBA,
-            size: (1, 6),
+            internal_format: Context::RGB8,
+            format: Context::RGB,
+            size: (800, 400),
             wrap_type: Context::REPEAT,
-            filter_type: Context::NEAREST,
-            // data: vec![253.0 as u8, 94.0 as u8, 0, 255]
-            data: vec![
-                128,   0,   0, 255,
-                128,   0, 128, 255,
-                  0, 128, 128, 255,
-                  0,   0, 128, 255,
-                 51, 153, 102, 255,
-                128, 128, 128, 255,
-            ]
+            filter_type: Context::LINEAR,
+            data: tex_atlas_pbm
         }).expect("texture")
     );
+    {
+        Texture2d::bind(&manager_ref, texture_atlas_handle);
+        manager_ref.get_texture2d(texture_atlas_handle).expect("atlas texture2d").setup_texture().expect("texture2d setup");
+    }
 
-    // VAO setup
-    let vert_arr_handle = manager_ref.insert_vertex_array(
-        VertexArray::new(&context).expect("vertex array")
-    );
-
-    let arr_buff_handle = manager_ref.insert_array_buffer(
-        ArrayBuffer::new(&context).expect("array buffer")
-    );
-
-    let elem_buff_handle = manager_ref.insert_element_array_buffer(
-        ElementArrayBuffer::new(&context).expect("element array buffer")
+    let robot_vao_handle = manager_ref.insert_vertex_array(
+        VertexArray::new(&context).expect("robot vertex array")
     );
 
     {
-        VertexArray::bind(&manager_ref, vert_arr_handle);
-        // Setup the vertex array buffer with the triangle vertices
+        let arr_buff_handle = manager_ref.insert_array_buffer(
+            ArrayBuffer::new(&context).expect("robot array buffer")
+        );
+
+        let elem_buff_handle = manager_ref.insert_element_array_buffer(
+            ElementArrayBuffer::new(&context).expect("robot element array buffer")
+        );
+        VertexArray::bind(&manager_ref, robot_vao_handle);
+        // Setup the vertex array buffer with the robot vertices
         ArrayBuffer::bind(&manager_ref, arr_buff_handle);
         {
-            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("array buffer");
-            // arr_buff.buffer_data(&TRIANGLE_VERTICESS, Context::STATIC_DRAW);
-            arr_buff.buffer_data(&CUBE_VERTICES, Context::STATIC_DRAW);
+            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("robot array buffer");
+            arr_buff.buffer_data(&robot_mesh.vertices, Context::STATIC_DRAW);
         }
-        // Setup the element array buffer with the triangle indices
+        // Setup the element array buffer with the robot indices
         ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
         {
-            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("element array buffer");
-            //elem_arr_buff.buffer_data(&TRIANGLE_INDICES, Context::STATIC_DRAW);
-            elem_arr_buff.buffer_data(&CUBE_INDICES, Context::STATIC_DRAW);
+            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("robot element array buffer");
+            elem_arr_buff.buffer_data(&robot_mesh.indices, Context::STATIC_DRAW);
         }
         // Register the vertex and element array buffers with the VAO
         {
-            let mut vert_arr = manager_ref.get_mut_vertex_array(vert_arr_handle).expect("vertex array");
+            let mut vert_arr = manager_ref.get_mut_vertex_array(robot_vao_handle).expect("vertex array");
 
             let attribs = vec![
-                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, pos) as i32),
-                AttribPointer::without_defaults(1, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, tex) as i32),
+                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, position) as i32),
+                AttribPointer::without_defaults(1, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, normal) as i32),
+                AttribPointer::without_defaults(2, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, texcoord) as i32),
             ];
             vert_arr.register_array_buffer(arr_buff_handle, Some(attribs));
             vert_arr.register_element_array_buffer(elem_buff_handle, None);
         }
-        VertexArray::unbind(&manager_ref, vert_arr_handle);
+        VertexArray::unbind(&manager_ref, robot_vao_handle);
+        ArrayBuffer::unbind(&manager_ref, arr_buff_handle);
+        ElementArrayBuffer::unbind(&manager_ref, elem_buff_handle);
+    }
+
+    let room_vao_handle = manager_ref.insert_vertex_array(
+        VertexArray::new(&context).expect("room vertex array")
+    );
+
+    {
+        let arr_buff_handle = manager_ref.insert_array_buffer(
+            ArrayBuffer::new(&context).expect("room array buffer")
+        );
+
+        let elem_buff_handle = manager_ref.insert_element_array_buffer(
+            ElementArrayBuffer::new(&context).expect("room element array buffer")
+        );
+        VertexArray::bind(&manager_ref, room_vao_handle);
+        // Setup the vertex array buffer with the room vertices
+        ArrayBuffer::bind(&manager_ref, arr_buff_handle);
+        {
+            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("room array buffer");
+            arr_buff.buffer_data(&room_mesh.vertices, Context::STATIC_DRAW);
+        }
+        // Setup the element array buffer with the room indices
+        ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
+        {
+            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("room element array buffer");
+            elem_arr_buff.buffer_data(&room_mesh.indices, Context::STATIC_DRAW);
+        }
+        // Register the vertex and element array buffers with the VAO
+        {
+            let mut vert_arr = manager_ref.get_mut_vertex_array(room_vao_handle).expect("room vertex array");
+
+            let attribs = vec![
+                AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, position) as i32),
+                AttribPointer::without_defaults(1, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, normal) as i32),
+                AttribPointer::without_defaults(2, 2, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, texcoord) as i32),
+            ];
+            vert_arr.register_array_buffer(arr_buff_handle, Some(attribs));
+            vert_arr.register_element_array_buffer(elem_buff_handle, None);
+        }
+        VertexArray::unbind(&manager_ref, room_vao_handle);
         ArrayBuffer::unbind(&manager_ref, arr_buff_handle);
         ElementArrayBuffer::unbind(&manager_ref, elem_buff_handle);
     }
@@ -249,30 +344,42 @@ pub fn main() -> Result<(), JsValue>
     let delta_time: f32 = 0.01;
     let mut accumulator: f32 = 0.0;
 
-    let renderer = Renderer2D::new(&context.borrow(), &mut manager.borrow_mut()).expect("2d renderer");
+    let renderer = Renderer::new(&context.borrow(), &mut manager.borrow_mut(), &resource_manager.borrow()).expect("renderer");
 
-    // Setup render information for triangle
-    let mut transformation_t1 = Transformation::new();
-    let mut transformation_t2 = Transformation::new();
-    transformation_t2.global.scale(vec3(0.5, 0.5, 0.5));
-    transformation_t2.global.translate(vec3(-1.0, 0.0, 0.0));
-    let mut transformation_t3 = Transformation::new();
-    transformation_t3.global.translate(vec3(2.0, 0.0, 0.0));
-    let t1 = RenderDto
+    let mut robot1_transform = Transformation::new();
+    robot1_transform.global.translate(vec3(3.0, 0.25, 2.5));
+    robot1_transform.local.rotate_angle_axis(Deg(90.0), vec3(0.0, 1.0, 0.0));
+    robot1_transform.local.translate(vec3(1.0, 0.0, 0.0));
+
+    let mut robot2_transform = Transformation::new();
+    robot2_transform.global.translate(vec3(-3.0, 0.25, -3.0));
+    robot2_transform.local.rotate_angle_axis(Deg(90.0), vec3(0.0, 1.0, 0.0));
+    robot2_transform.local.translate(vec3(1.0, 0.0, 0.0));
+
+    // Setup render information
+    let robot_renderable = RenderDto
     {
-        tex_handle: texture_handle_t1,
-        vert_arr_handle: vert_arr_handle,
-        num_indices: 36,
+        tex_handle: texture_atlas_handle,
+        vert_arr_handle: robot_vao_handle,
+        num_indices: robot_mesh.indices.len() as i32,
     };
 
-    let perspective = cgmath::perspective(Deg(45.0f32), 1.0f32, 0.1f32, 20.0f32);
+    let mut room_transform = Transformation::new();
+    let room_renderable = RenderDto
+    {
+        tex_handle: texture_atlas_handle,
+        vert_arr_handle: room_vao_handle,
+        num_indices: room_mesh.indices.len() as i32,
+    };
+
+    let perspective = cgmath::perspective(Deg(45.0f32), canvas_size.0 as f32 / canvas_size.1 as f32, 0.1f32, 50.0f32);
     let camera = Rc::new(RefCell::new(
         Camera::from_eye(
             vec3(0.0, 0.0, 0.0),
-            vec3(0.0, 0.0, -1.0),
+            vec3(0.0, -0.5, -1.0),
             vec3(0.0, 1.0, 0.0)
         )));
-    camera.borrow_mut().move_cam_locked(vec3(-1.0, 0.0, 6.0));
+    camera.borrow_mut().move_cam_locked(vec3(0.0, 5.0, 9.0));
     {
         clone!(camera);
         let callback = move |event: web_sys::WheelEvent|
@@ -292,10 +399,12 @@ pub fn main() -> Result<(), JsValue>
 
     {
         clone!(camera);
+        let canvas_clone = canvas.clone();
         let callback = move |event: web_sys::MouseEvent|
             {
                 if event.buttons() == 1
                 {
+                    canvas_clone.request_pointer_lock();
                     borrow_mut!(camera);
                     if event.movement_x() != 0
                     {
@@ -343,9 +452,8 @@ pub fn main() -> Result<(), JsValue>
                     // Perform any updates skipped due to missed frames
                     while accumulator >= delta_time
                     {
-                        transformation_t1.local.rotate_angle_axis(Deg(10.0 * delta_time), vec3(0.0, 0.0, 1.0));
-                        transformation_t2.local.rotate_angle_axis(Deg(20.0 * delta_time), vec3(1.0, 1.0, 1.0));
-                        transformation_t3.local.rotate_angle_axis(Deg( 5.0 * delta_time), vec3(1.0, 1.0, 0.0));
+                        robot1_transform.local.rotate_angle_axis(Deg(40.0 * delta_time), vec3(0.0, 1.0, 0.0));
+                        robot2_transform.local.rotate_angle_axis(Deg(-40.0 * delta_time), vec3(0.0, 1.0, 0.0));
 
                         accumulator -= delta_time;
                     }
@@ -361,24 +469,23 @@ pub fn main() -> Result<(), JsValue>
                             vec![
                                 // Cubert
                                 Node(
-                                    &t1,
-                                    transformation_t1.matrix(),
-                                    //None
-                                    Some(vec![
-                                        // Cubling
-                                        Node(
-                                            &t1,
-                                            transformation_t2.matrix(),
-                                            None
-                                        ),
-                                    ])
+                                    &robot_renderable,
+                                    robot1_transform.matrix(),
+                                    None
                                 ),
                                 // Cuberta
                                 Node(
-                                    &t1,
-                                    transformation_t3.matrix(),
+                                    &robot_renderable,
+                                    robot2_transform.matrix(),
                                     None
                                 ),
+                                Node(
+                                    &room_renderable,
+                                    room_transform.matrix(),
+                                    Some(vec![
+
+                                    ]),
+                                )
                             ];
 
                         renderer.render(&context, &manager.borrow(), perspective * camera.borrow().view_matrix(), &nodes);
@@ -421,7 +528,7 @@ pub fn main() -> Result<(), JsValue>
         };
 
     // Setup and start render loop
-    let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func).expect("render_loop")));
+    let render_loop = Rc::new(RefCell::new(RenderLoop::init(&window, &canvas, &context, &manager, render_func, context_config_func).expect("render_loop")));
     render_loop.borrow_mut().start().unwrap();
 
     {
@@ -443,6 +550,15 @@ pub fn main() -> Result<(), JsValue>
         let ev = EventListener::new(&canvas, "wheel", callback).expect("event listener registered");
         ev.forget();
     }
+
+    Ok(())
+}
+
+#[wasm_bindgen(start)]
+pub fn main_function() -> Result<(), JsValue>
+{
+    #[cfg(feature="debug")]
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     Ok(())
 }

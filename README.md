@@ -26,5 +26,12 @@ All output is within the `./build` directory. See `testsite.html` to see how to 
 
 ### Running
 - The included `testsite.html` is a simple html file that loads the generated javascript/WASM file(s).  
-- `testserver.py` is a python script that will run a web server that supports WASM at http://127.0.0.1:8080/testsite.html  
+- `testserver.py` is a python script that will run a web server that supports WASM at [http://127.0.0.1:8080/testsite.html](http://127.0.0.1:8080/testsite.html)  
 - Python version 3.7.5 or higher is required. Script is from [here](https://cggallant.blogspot.com/2020/07/extending-pythons-simple-http-server.html)
+
+### Testing
+#### Regular Tests
+Run `cargo test` to run normal Rust tests  
+Run `cargo test -- --nocapture` to run normal Rust tests with output from print statements
+#### WASM Tests
+Run `wasmtest.py` and open [http://127.0.0.1:8000](http://127.0.0.1:8000) to run WASM tests

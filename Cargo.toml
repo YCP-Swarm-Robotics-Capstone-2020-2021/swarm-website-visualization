@@ -27,6 +27,8 @@ cgmath = "0.17"
 js-sys = "0.3"
 twox-hash = "1.5.0"
 memoffset = "0.5"
+tobj = "2.0"
+float-cmp = "0.8.0"
 
 [dependencies.web-sys]
 version = "0.3"
@@ -41,6 +43,10 @@ features = [
     'MouseEvent',
     'WheelEvent',
     'Performance',
+    'FocusEvent',
+    'XmlHttpRequest',
+    'XmlHttpRequestResponseType',
+    'ProgressEvent',
 
     # WebGL stuff
     'WebGl2RenderingContext',
@@ -57,7 +63,7 @@ features = [
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"
+wasm-bindgen-futures = "0.4.18"
 
 [profile.release]
-# Optimize release for size
-opt-level = "s"
+lto=true

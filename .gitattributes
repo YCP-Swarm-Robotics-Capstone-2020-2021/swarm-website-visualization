@@ -1,1 +1,7 @@
-* text eol=lf 
+* text eol=lf
+*.jpg binary
+*.png binary
+*.pbm binary
+*.mtl linguist-vendored
+/resources/** linguist-vendored
+/resources/shaders/** linguist-vendored=false

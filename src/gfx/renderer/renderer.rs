@@ -14,12 +14,13 @@ use crate::
         {
             manager::{GlObjectManager, GlObjectHandle},
             traits::GlObject,
-            shader_program::{ShaderProgram, shader_source},
+            shader_program::ShaderProgram,
             uniform_buffer::UniformBuffer,
             vertex_array::VertexArray,
             texture::Texture2d
         },
     },
+    resource::manager::ResourceManager,
 };
 
 /// Render info data transfer object
@@ -34,32 +35,40 @@ pub struct RenderDto
 /// The second parameter is a model matrix and the third parameter is any child nodes
 pub struct Node<'a>(pub &'a RenderDto, pub &'a Matrix4<f32>, pub Option<Vec<Node<'a>>>);
 
-/// 2D Scene Renderer
-pub struct Renderer2D
+/// Scene Renderer
+pub struct Renderer
 {
     shader_program_handle: GlObjectHandle,
     uniform_buff_handle: GlObjectHandle,
 }
 
-impl Renderer2D
+impl Renderer
 {
-    /// Create a new Renderer2D instance
-    pub fn new(context: &Context, manager: &mut GlObjectManager) -> Result<Renderer2D, GfxError>
+    /// Create a new Renderer instance
+    pub fn new(context: &Context, gl_manager: &mut GlObjectManager, resource_manager: &ResourceManager) -> Result<Renderer, GfxError>
     {
-        let renderer = Renderer2D
+        // Get shader source code and read into string
+        let vert_shader = String::from_utf8(resource_manager.get_by_name(&"texture_vert.glsl".to_string())
+            .ok_or_else(|| GfxError::Other("texture_vert.glsl not available by name in resource manager".to_string()))?.clone())
+            .or_else(|err| Err(GfxError::Other(format!("Error reading texture_vert.glsl into string: {}", err.to_string()))))?;
+        let frag_shader = String::from_utf8(resource_manager.get_by_name(&"texture_frag.glsl".to_string()).
+            ok_or_else(|| GfxError::Other("texture_frag.glsl not available by name in resource manager".to_string()))?.clone())
+            .or_else(|err| Err(GfxError::Other(format!("Error reading texture_frag.glsl into string: {}", err.to_string()))))?;
+
+        let renderer = Renderer
         {
-            shader_program_handle: manager.insert_shader_program(
-                ShaderProgram::new(&context, Some(shader_source::TEXTURE_VERT.to_string()), Some(shader_source::TEXTURE_FRAG.to_string()))?,
+            shader_program_handle: gl_manager.insert_shader_program(
+                ShaderProgram::new(&context, Some(vert_shader), Some(frag_shader))?,
             ),
-            uniform_buff_handle: manager.insert_uniform_buffer(
+            uniform_buff_handle: gl_manager.insert_uniform_buffer(
                 UniformBuffer::new(&context, std::mem::size_of::<Matrix4<f32>>() as i32, 0, Context::DYNAMIC_DRAW)?
             ),
         };
         // Setup the renderer's uniform buffer
-        ShaderProgram::bind(manager, renderer.shader_program_handle);
-        UniformBuffer::bind(manager, renderer.uniform_buff_handle);
-        let mut shader_program = manager.get_mut_shader_program(renderer.shader_program_handle).expect("renderer2d shader program");
-        let mut uniform_buffer = manager.get_mut_uniform_buffer(renderer.uniform_buff_handle).expect("renderer2d uniform buffer");
+        ShaderProgram::bind(gl_manager, renderer.shader_program_handle);
+        UniformBuffer::bind(gl_manager, renderer.uniform_buff_handle);
+        let mut shader_program = gl_manager.get_mut_shader_program(renderer.shader_program_handle).expect("renderer shader program");
+        let mut uniform_buffer = gl_manager.get_mut_uniform_buffer(renderer.uniform_buff_handle).expect("renderer uniform buffer");
         // Set the shader sampler2d to TEXTURE0
         shader_program.set_uniform_i32("tex", &[0])?;
         uniform_buffer.add_vert_block(&mut shader_program, "VertData")?;
@@ -77,7 +86,7 @@ impl Renderer2D
         ShaderProgram::bind(manager, self.shader_program_handle);
         UniformBuffer::bind(manager, self.uniform_buff_handle);
 
-        let mut uniform_buffer: RefMut<UniformBuffer> = manager.get_mut_uniform_buffer(self.uniform_buff_handle).expect("renderer2d uniform buffer");
+        let mut uniform_buffer: RefMut<UniformBuffer> = manager.get_mut_uniform_buffer(self.uniform_buff_handle).expect("renderer uniform buffer");
         // context.active_texture(Context::TEXTURE0);
         manager.set_active_texture(&context, Context::TEXTURE0);
 

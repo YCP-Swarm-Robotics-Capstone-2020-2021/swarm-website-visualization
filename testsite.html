@@ -4,12 +4,11 @@
         <meta charset="utf-8">
         <!-- Sample use with `--target web` -->
         <!--<script type="module">
-            import init, {pointless_binding} from 'build/swarm_website_visualization.js';
+            import init, {} from 'build/swarm_website_visualization.js';
 
             async function run()
             {
                 await init();
-                pointless_binding("Hello from a Rust function binding that calls JS alert()!");
             }
 
             run();
@@ -25,17 +24,17 @@
                 ext.loseContext();
                 setTimeout(() => ext.restoreContext(), 1000);
             }
-            const { /*pointless_binding*/ } = wasm_bindgen;
+            const { init_visualization } = wasm_bindgen;
             async function run()
             {
                 await wasm_bindgen('./build/swarm_website_visualization_bg.wasm');
-                // pointless_binding("Hello from a Rust function binding that calls JS alert()!");
+                init_visualization("canvas", "/resources");
             }
             run();
         </script>
     </head>
     <body>
         <!--tabindex="1" allows the canvas to be focusable-->
-        <canvas id="canvas" tabindex="1" width="800" height="800"/>
+        <canvas id="canvas" tabindex="1" width="1280" height="720" style=""/>
     </body>
 </html>
