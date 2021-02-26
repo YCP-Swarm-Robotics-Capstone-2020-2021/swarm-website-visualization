@@ -24,17 +24,50 @@
                 ext.loseContext();
                 setTimeout(() => ext.restoreContext(), 1000);
             }
-            const { init_visualization } = wasm_bindgen;
-            async function run()
+            // Function to assign width and height HTML attributes to canvas since it isn't done automatically
+            function setCanvasWidthHeight()
             {
-                await wasm_bindgen('./build/swarm_website_visualization_bg.wasm');
-                init_visualization("canvas", "/resources");
+                let canvas = document.getElementById("canvas");
+                let rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
             }
-            run();
+            window.onresize = () =>
+            {
+                // Update the width and height attributes of the canvas
+                setCanvasWidthHeight();
+
+                // Set the WebGL viewport to be a 16:9 resolution close to the dimensions of the canvas to prevent
+                // distortion
+                let canvas = document.getElementById("canvas");
+                let context = canvas.getContext("webgl2");
+                let width = canvas.width;
+                let height = canvas.height;
+                while(Math.abs((width / height) - (16.0/9.0)) > 0.005)
+                {
+                    let x = Math.floor(Math.max(width / 16.0, height / 9.0));
+                    width = x * 16;
+                    height = x * 9;
+                }
+                context.viewport(0, 0, width, height);
+            };
+
+            window.onload = () =>
+            {
+                setCanvasWidthHeight();
+
+                const { init_visualization } = wasm_bindgen;
+                async function run()
+                {
+                    await wasm_bindgen('./build/swarm_website_visualization_bg.wasm');
+                    init_visualization("canvas", "/resources");
+                }
+                run();
+            };
         </script>
     </head>
     <body>
         <!--tabindex="1" allows the canvas to be focusable-->
-        <canvas id="canvas" tabindex="1" width="1280" height="720" style=""/>
+        <canvas id="canvas" tabindex="1" style="width:100%;"/>
     </body>
 </html>

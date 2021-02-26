@@ -204,12 +204,16 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
     let canvas_size: (u32, u32) = (canvas.width(), canvas.height());
 
     let context = new_context(&canvas)?;
-    let context_config_func = move |context: &Context|
+    let context_config_func =
         {
-            context.viewport(0, 0, canvas_size.0 as i32, canvas_size.1 as i32);
-            context.pixel_storei(Context::UNPACK_ALIGNMENT, 1);
-            context.enable(Context::CULL_FACE);
-            context.enable(Context::DEPTH_TEST);
+            let canvas = canvas.clone();
+            move |context: &Context|
+                {
+                    context.viewport(0, 0, canvas.width() as i32, canvas.height() as i32);
+                    context.pixel_storei(Context::UNPACK_ALIGNMENT, 1);
+                    context.enable(Context::CULL_FACE);
+                    context.enable(Context::DEPTH_TEST);
+                }
         };
     context_config_func(&context);
 
