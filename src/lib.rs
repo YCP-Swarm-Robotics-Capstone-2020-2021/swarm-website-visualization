@@ -201,6 +201,36 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
             let elem = document.get_element_by_id(&canvas_id).expect("canvas element exists");
             elem.dyn_into::<HtmlCanvasElement>()?
         };
+
+    {
+        fn update_canvas_size(canvas: &HtmlCanvasElement)
+        {
+            let rect = canvas.get_bounding_client_rect();
+            canvas.set_width(rect.width() as u32);
+            canvas.set_height(rect.height() as u32);
+        }
+        update_canvas_size(&canvas);
+
+        let canvas = canvas.clone();
+        let callback = move |_event: web_sys::UiEvent|
+            {
+                update_canvas_size(&canvas);
+
+                let mut width = canvas.width() as f32;
+                let mut height = canvas.height() as f32;
+
+                while approx_eq!(f32, width / height, 16.0/9.0)
+                {
+                    let x = ((width / 16.0).max(height / 9.0)).floor();
+                    width = x * 16.0;
+                    height = x * 9.0;
+                }
+                let context = new_context(&canvas).expect("canvas webgl2 context");
+                context.viewport(0, 0, width as i32, height as i32);
+            };
+        let ev = EventListener::new(&window, "resize", callback).expect("event listener registered");
+        ev.forget();
+    }
     let canvas_size: (u32, u32) = (canvas.width(), canvas.height());
 
     let context = new_context(&canvas)?;
