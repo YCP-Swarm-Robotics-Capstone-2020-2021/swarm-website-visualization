@@ -219,7 +219,7 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
                 let mut width = canvas.width() as f32;
                 let mut height = canvas.height() as f32;
 
-                while approx_eq!(f32, width / height, 16.0/9.0)
+                while !approx_eq!(f32, width / height, 16.0/9.0, epsilon=0.005)
                 {
                     let x = ((width / 16.0).max(height / 9.0)).floor();
                     width = x * 16.0;
