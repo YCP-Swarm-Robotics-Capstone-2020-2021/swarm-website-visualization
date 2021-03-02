@@ -49,6 +49,9 @@ features = [
     'XmlHttpRequest',
     'XmlHttpRequestResponseType',
     'ProgressEvent',
+    'UiEvent',
+    'DomRect',
+
 
     # WebGL stuff
     'WebGl2RenderingContext',

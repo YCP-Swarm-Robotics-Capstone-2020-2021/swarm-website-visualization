@@ -3,20 +3,20 @@
     <head>
         <meta charset="utf-8">
         <!-- Sample use with `--target web` -->
-        <!--<script type="module">
-            import init, {} from 'build/swarm_website_visualization.js';
+        <script type="module">
+            import init, { init_visualization } from './build/swarm_website_visualization.js';
 
             async function run()
             {
                 await init();
+                init_visualization("canvas", "/resources");
             }
 
             run();
         </script> 
-        -->
 
         <!-- Sample use with `--target no-modules` -->
-        <script type="text/javascript" src='./build/swarm_website_visualization.js'></script>
+<!--        <script type="text/javascript" src='./build/swarm_website_visualization.js'></script>
         <script>
             function simContextLoss()
             {
@@ -24,17 +24,20 @@
                 ext.loseContext();
                 setTimeout(() => ext.restoreContext(), 1000);
             }
-            const { init_visualization } = wasm_bindgen;
-            async function run()
+            window.onload = () =>
             {
-                await wasm_bindgen('./build/swarm_website_visualization_bg.wasm');
-                init_visualization("canvas", "/resources");
-            }
-            run();
-        </script>
+                const { init_visualization } = wasm_bindgen;
+                async function run()
+                {
+                    await wasm_bindgen('./build/swarm_website_visualization_bg.wasm');
+                    init_visualization("canvas", "/resources");
+                }
+                run();
+            };
+        </script>-->
     </head>
     <body>
         <!--tabindex="1" allows the canvas to be focusable-->
-        <canvas id="canvas" tabindex="1" width="1280" height="720" style=""/>
+        <canvas id="canvas" tabindex="1" style="width:100%;"/>
     </body>
 </html>
