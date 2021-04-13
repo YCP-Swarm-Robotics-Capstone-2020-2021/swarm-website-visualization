@@ -71,7 +71,7 @@ use crate::
     math::transform::{Transformation},
     resource::
     {
-        loader::{ResourceLoader, OnloadCallbackArgs,},
+        async_loader::{self, /*AsyncResourceError*/},
         manager::ResourceManager,
     },
 };
@@ -95,7 +95,7 @@ fn log_s(s: String)
 
 
 #[wasm_bindgen]
-pub fn init_visualization(canvas_id: &str, resource_dir: &str) -> Result<(), JsValue>
+pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Result<(), JsValue>
 {
     let canvas_id = 
         {
@@ -126,73 +126,48 @@ pub fn init_visualization(canvas_id: &str, resource_dir: &str) -> Result<(), JsV
             }
         };
 
-    let resource_manager = Rc::new(RefCell::new(ResourceManager::new()));
+    let mut resource_manager = ResourceManager::new();
 
-    let mut resource_loader = ResourceLoader::new();
+    let mut resource_urls = vec![
+        "models/robot.obj".to_string(),
+        "models/room.obj".to_string(),
+        "images/tex_atlas.pbm".to_string(),
+        "shaders/texture_vert.glsl".to_string(),
+        "shaders/texture_frag.glsl".to_string(),
+    ];
 
+    for url in &mut resource_urls
     {
-        let resource = resource_dir.to_owned() + "models/robot.obj";
-        let request_handle = resource_loader.add_request("GET", resource)?;
-        clone!(resource_manager);
-        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
-            {
-                resource_manager.borrow_mut().insert_with_name("robot.obj".to_string(), bytes);
-            });
-    }
-    {
-        let resource = resource_dir.to_owned() + "models/room.obj";
-        let request_handle = resource_loader.add_request("GET", resource)?;
-        clone!(resource_manager);
-        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
-            {
-                resource_manager.borrow_mut().insert_with_name("room.obj".to_string(), bytes);
-            });
-    }
-    {
-        let resource = resource_dir.to_owned() + "images/tex_atlas.pbm";
-        let request_handle = resource_loader.add_request("GET", resource)?;
-        clone!(resource_manager);
-        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
-            {
-                resource_manager.borrow_mut().insert_with_name("tex_atlas.pbm".to_string(), bytes);
-            });
-    }
-    {
-        let resource = resource_dir.to_owned() + "shaders/texture_vert.glsl";
-        let request_handle = resource_loader.add_request("GET", resource)?;
-        clone!(resource_manager);
-        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
-            {
-                resource_manager.borrow_mut().insert_with_name("texture_vert.glsl".to_string(), bytes);
-            });
-    }
-    {
-        {
-            let resource = resource_dir.to_owned() + "shaders/texture_frag.glsl";
-            let request_handle = resource_loader.add_request("GET", resource)?;
-            clone!(resource_manager);
-            resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
-                {
-                    resource_manager.borrow_mut().insert_with_name("texture_frag.glsl".to_string(), bytes);
-                });
-        }
+        *url = resource_dir.to_owned() + url;
     }
 
-    {
-        clone!(resource_manager);
-        resource_loader.set_onloadend(move ||
-            {
-                start(canvas_id, resource_dir, resource_manager).expect("visualization start() func");
-            });
-    }
-    resource_loader.submit();
+    let urls = resource_urls.iter().map(AsRef::<str>::as_ref).collect();
+    let mut resources = async_loader::load_multiple(&urls).await;
+
+    resource_manager.insert_with_name(
+        "robot.obj".to_string(),
+        resources.remove(0).expect("robot.obj"));
+    resource_manager.insert_with_name(
+        "room.obj".to_string(),
+        resources.remove(0).expect("room.obj"));
+    resource_manager.insert_with_name(
+        "tex_atlas.pbm".to_string(),
+        resources.remove(0).expect("tex_atlas.pbm"));
+    resource_manager.insert_with_name(
+        "texture_vert.glsl".to_string(),
+        resources.remove(0).expect("texture_vert.glsl"));
+    resource_manager.insert_with_name(
+        "texture_frag.glsl".to_string(),
+        resources.remove(0).expect("texture_frag.glsl"));
+
+    start(canvas_id, resource_dir, Rc::new(RefCell::new(resource_manager)))
+        .expect("visualization start() func");
 
     Ok(())
 }
 
 fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
 {
-
     // Get HTML element references
     let window: Window = window().expect("window context");
     let document: Document = window.document().expect("document context");
