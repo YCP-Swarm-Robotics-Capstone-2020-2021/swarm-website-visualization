@@ -48,10 +48,10 @@ impl Renderer
     pub fn new(context: &Context, gl_manager: &mut GlObjectManager, resource_manager: &ResourceManager) -> Result<Renderer, GfxError>
     {
         // Get shader source code and read into string
-        let vert_shader = String::from_utf8(resource_manager.get_by_name(&"texture_vert.glsl".to_string())
+        let vert_shader = String::from_utf8(resource_manager.get_by_name("texture_vert.glsl")
             .ok_or_else(|| GfxError::Other("texture_vert.glsl not available by name in resource manager".to_string()))?.clone())
             .or_else(|err| Err(GfxError::Other(format!("Error reading texture_vert.glsl into string: {}", err.to_string()))))?;
-        let frag_shader = String::from_utf8(resource_manager.get_by_name(&"texture_frag.glsl".to_string()).
+        let frag_shader = String::from_utf8(resource_manager.get_by_name("texture_frag.glsl").
             ok_or_else(|| GfxError::Other("texture_frag.glsl not available by name in resource manager".to_string()))?.clone())
             .or_else(|err| Err(GfxError::Other(format!("Error reading texture_frag.glsl into string: {}", err.to_string()))))?;
 

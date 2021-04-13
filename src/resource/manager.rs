@@ -34,10 +34,10 @@ impl ResourceManager
     ///
     /// If `name` already exists, it overwrites the existing resource
     #[allow(dead_code)]
-    pub fn insert_with_name(&mut self, name: String, resource: Vec<u8>) -> ResourceHandle
+    pub fn insert_with_name<S: Into<String>>(&mut self, name: S, resource: Vec<u8>) -> ResourceHandle
     {
         let handle = self.insert(resource);
-        if let Some(old) = self.handle_map.insert(name, handle)
+        if let Some(old) = self.handle_map.insert(name.into(), handle)
         {
             self.resources.remove(old);
         }
@@ -51,14 +51,14 @@ impl ResourceManager
     }
 
     #[allow(dead_code)]
-    pub fn get_by_name(&self, name: &String) -> Option<&Vec<u8>>
+    pub fn get_by_name(&self, name: &str) -> Option<&Vec<u8>>
     {
         let handle = *self.handle_map.get(name)?;
         self.get(handle)
     }
 
     #[allow(dead_code)]
-    pub fn get_named_handle(&self, name: &String) -> Option<ResourceHandle>
+    pub fn get_named_handle(&self, name: &str) -> Option<ResourceHandle>
     {
         self.handle_map.get(name).copied()
     }
@@ -70,7 +70,7 @@ impl ResourceManager
     }
 
     #[allow(dead_code)]
-    pub fn remove_by_name(&mut self, name: &String) -> Option<Vec<u8>>
+    pub fn remove_by_name(&mut self, name: &str) -> Option<Vec<u8>>
     {
         let handle = self.handle_map.remove(name)?;
         self.remove(handle)
@@ -104,8 +104,8 @@ mod tests
 
         assert_eq!(manager.get(r1).unwrap(), &vec![0u8, 1u8]);
         assert_eq!(manager.get(r2).unwrap(), &vec![2u8, 3u8]);
-        assert_eq!(manager.get_by_name(&"name1".to_string()), Some(&vec![0u8, 1u8]));
-        assert_eq!(manager.get_by_name(&"name2".to_string()), Some(&vec![2u8, 3u8]));
+        assert_eq!(manager.get_by_name("name1"), Some(&vec![0u8, 1u8]));
+        assert_eq!(manager.get_by_name("name2"), Some(&vec![2u8, 3u8]));
         assert_eq!(manager.get_named_handle(&"name1".to_string()), Some(r1));
         assert_eq!(manager.get_named_handle(&"name2".to_string()), Some(r2));
         assert_eq!(manager.remove_by_name(&"name1".to_string()), Some(vec![0u8, 1u8]));

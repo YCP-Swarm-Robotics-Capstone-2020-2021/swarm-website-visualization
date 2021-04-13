@@ -141,23 +141,23 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
         *url = resource_dir.to_owned() + url;
     }
 
-    let urls = resource_urls.iter().map(AsRef::<str>::as_ref).collect();
-    let mut resources = async_loader::load_multiple(&urls).await;
+    //let urls = resource_urls.iter().map(AsRef::<str>::as_ref).collect();
+    let mut resources = async_loader::load_multiple(&resource_urls).await;
 
     resource_manager.insert_with_name(
-        "robot.obj".to_string(),
+        "robot.obj",
         resources.remove(0).expect("robot.obj"));
     resource_manager.insert_with_name(
-        "room.obj".to_string(),
+        "room.obj",
         resources.remove(0).expect("room.obj"));
     resource_manager.insert_with_name(
-        "tex_atlas.pbm".to_string(),
+        "tex_atlas.pbm",
         resources.remove(0).expect("tex_atlas.pbm"));
     resource_manager.insert_with_name(
-        "texture_vert.glsl".to_string(),
+        "texture_vert.glsl",
         resources.remove(0).expect("texture_vert.glsl"));
     resource_manager.insert_with_name(
-        "texture_frag.glsl".to_string(),
+        "texture_frag.glsl",
         resources.remove(0).expect("texture_frag.glsl"));
 
     start(canvas_id, resource_dir, Rc::new(RefCell::new(resource_manager)))
@@ -222,9 +222,9 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
         };
     context_config_func(&context);
 
-    let robot_obj = resource_manager.borrow().get_by_name(&"robot.obj".to_string()).expect("robot obj resource").clone();
+    let robot_obj = resource_manager.borrow().get_by_name("robot.obj").expect("robot obj resource").clone();
     let robot_mesh = Mesh::from_reader(&*robot_obj).expect("robot mesh");
-    let room_obj = resource_manager.borrow().get_by_name(&"room.obj".to_string()).expect("room obj resource").clone();
+    let room_obj = resource_manager.borrow().get_by_name("room.obj").expect("room obj resource").clone();
     let room_mesh = Mesh::from_reader(&*room_obj).expect("room mesh");
 
     // Setup object manager
@@ -233,7 +233,7 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
 
 
     // Texture atlas
-    let tex_atlas_pbm = resource_manager.borrow().get_by_name(&"tex_atlas.pbm".to_string()).expect("texture atlas").clone();
+    let tex_atlas_pbm = resource_manager.borrow().get_by_name("tex_atlas.pbm").expect("texture atlas").clone();
 
     let texture_atlas_handle = manager_ref.insert_texture2d(
         Texture2d::new(&context, Texture2dParams
