@@ -77,6 +77,7 @@ pub struct ResourceLoader
 impl ResourceLoader
 {
     /// Create empty resource loader
+    #[allow(dead_code)]
     pub fn new() -> Self
     {
         ResourceLoader
