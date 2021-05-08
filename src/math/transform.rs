@@ -103,7 +103,7 @@ impl SubTransformation
     pub fn set_orientation_quat(&mut self, orientation: Quaternion<f32>)
     {
         // Remove current orientation from the position
-        self.translation = (self.orientation.conjugate() * orientation).normalize() * self.translation;
+        self.translation = (self.orientation.conjugate()/* * orientation*/).normalize() * self.translation;
         // Set new orientation
         self.orientation = orientation;
         // Apply new orientation to position
