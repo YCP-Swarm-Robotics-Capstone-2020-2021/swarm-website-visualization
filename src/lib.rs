@@ -381,7 +381,7 @@ async fn start(canvas_id: String, resource_dir: String, resource_manager: Rc<Ref
             vec3(0.0, -0.5, -1.0),
             vec3(0.0, 1.0, 0.0)
         )));
-    camera.borrow_mut().move_cam_locked(vec3(0.0, 5.0, 9.0));
+    camera.borrow_mut().move_cam_locked(vec3(0.0, 10.0, 20.0));
     {
         clone!(camera);
         let callback = move |event: web_sys::WheelEvent|
