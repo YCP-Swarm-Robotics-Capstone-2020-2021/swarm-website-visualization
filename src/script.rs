@@ -38,20 +38,7 @@ pub struct Script
 
 impl Script
 {
-    pub fn new() -> Script
-    {
-        Script
-        {
-            timestamp_increment: 0.0,
-            timestamp_rounding: 0,
-            first_timestamp: 0.0,
-            last_timestamp: 0.0,
-            current_timestamp: 0.0,
-            timestamps: Default::default()
-        }
-    }
-
-    pub fn read(&mut self, script: &str) -> Result<(), std::num::ParseFloatError>
+    pub fn new(script_str: &str) -> Result<Script, std::num::ParseFloatError>
     {
         // Format of a single timestamp in the incoming script
         #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,14 +64,17 @@ impl Script
         }
 
         // Deserialize the script
-        let parsed: JsonData = serde_json::from_str(script).unwrap();
+        let parsed: JsonData = serde_json::from_str(script_str).unwrap();
 
-        // Transfer over variables
-        self.timestamp_increment = parsed.timeinc;
-        self.timestamp_rounding = parsed.timeround;
-        self.first_timestamp = parsed.timestart;
-        self.last_timestamp = parsed.timeend;
-        self.current_timestamp = self.first_timestamp;
+        let mut script = Script
+        {
+            timestamp_increment: parsed.timeinc,
+            timestamp_rounding: parsed.timeround,
+            first_timestamp: parsed.timestart,
+            last_timestamp: parsed.timeend,
+            current_timestamp: parsed.timestart,
+            timestamps: Default::default()
+        };
 
         // Hashmap for storing last known data about each robot for filling in the
         // "notUpdated" entries
@@ -107,12 +97,12 @@ impl Script
                 robots.push(robot.clone());
             }
             // Add the robots to the timestamp
-            self.timestamps.insert(timestamp.time.to_bits(), robots);
+            script.timestamps.insert(timestamp.time.to_bits(), robots);
         }
 
-        crate::log_s(format!("==START SCRIPT==\n{:?}\n==END SCRIPT==", self));
+        crate::log_s(format!("==START SCRIPT==\n{:?}\n==END SCRIPT==", script));
 
-        Ok(())
+        Ok(script)
     }
 
     /// Given a time, make sure that timestamp corresponds to the script's timestamp rounding

@@ -439,8 +439,7 @@ async fn start(canvas_id: String, resource_dir: String, resource_manager: Rc<Ref
 
             string
         };
-    let mut script = script::Script::new();
-    script.read(&script_str).expect("script parsed");
+    let mut script = script::Script::new(&script_str).expect("script parsed");
 
     let render_func =
         {
