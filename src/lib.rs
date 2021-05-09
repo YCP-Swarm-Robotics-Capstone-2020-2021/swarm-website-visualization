@@ -17,7 +17,10 @@ use std::
     rc::Rc,
     cell::RefCell,
     time::Duration,
+    hash::BuildHasherDefault,
+    collections::HashMap,
 };
+use twox_hash::XxHash32;
 
 #[macro_use]
 mod redeclare;
@@ -141,15 +144,6 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
     {
         *url = resource_dir.to_owned() + url;
     }
-    {
-        let resource = resource_dir.to_owned() + "scripts/test_script.script";
-        let request_handle = resource_loader.add_request("GET", resource)?;
-        clone!(resource_manager);
-        resource_loader.set_request_onload(request_handle, move |OnloadCallbackArgs(_, bytes)|
-            {
-                resource_manager.borrow_mut().insert_with_name("script".to_string(), bytes);
-            });
-    }
 
     //let urls = resource_urls.iter().map(AsRef::<str>::as_ref).collect();
     let mut resources = async_loader::load_multiple(&resource_urls).await;
@@ -170,13 +164,13 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
         "texture_frag.glsl",
         resources.remove(0).expect("texture_frag.glsl"));
 
-    start(canvas_id, resource_dir, Rc::new(RefCell::new(resource_manager)))
+    start(canvas_id, resource_dir, Rc::new(RefCell::new(resource_manager))).await
         .expect("visualization start() func");
 
     Ok(())
 }
 
-fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
+async fn start(canvas_id: String, resource_dir: String, resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
 {
     // Get HTML element references
     let window: Window = window().expect("window context");
@@ -364,16 +358,6 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
 
     let renderer = Renderer::new(&context.borrow(), &mut manager.borrow_mut(), &resource_manager.borrow()).expect("renderer");
 
-    let mut robot1_transform = Transformation::new();
-    robot1_transform.global.translate(vec3(3.0, 0.25, 2.5));
-    robot1_transform.local.rotate_angle_axis(Deg(90.0), vec3(0.0, 1.0, 0.0));
-    robot1_transform.local.translate(vec3(1.0, 0.0, 0.0));
-
-    let mut robot2_transform = Transformation::new();
-    robot2_transform.global.translate(vec3(-3.0, 0.25, -3.0));
-    robot2_transform.local.rotate_angle_axis(Deg(90.0), vec3(0.0, 1.0, 0.0));
-    robot2_transform.local.translate(vec3(1.0, 0.0, 0.0));
-
     // Setup render information
     let robot_renderable = RenderDto
     {
@@ -444,13 +428,25 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
 
     let input_listener = Rc::new(InputStateListener::new(&canvas).expect("input state listener"));
 
+    let script_str =
+        {
+            let name = "scripts/test_script.script".to_owned();
+            let dir = resource_dir.to_owned() + &name;
+            let resource = async_loader::load(dir).await.expect("downloaded test script");
+            let string = String::from_utf8(resource.to_owned()).expect("script as string");
+            borrow_mut!(resource_manager);
+            resource_manager.insert_with_name(name, resource);
+
+            string
+        };
     let mut script = script::Script::new();
-    let str = String::from_utf8(resource_manager.borrow().get_by_name(&"script".to_string()).expect("script file").to_owned()).expect("script as string");
-    script.read(&str);
+    script.read(&script_str).expect("script parsed");
 
     let render_func =
         {
             clone!(context, manager, camera);
+            // Transformation objects for each robot being rendered. Key is robot ID
+            let mut transformations: HashMap<String, Transformation, BuildHasherDefault<XxHash32>> = Default::default();
 
             move ||
                 {
@@ -474,9 +470,6 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
                     // Perform any updates skipped due to missed frames
                     while accumulator >= delta_time
                     {
-                        //robot1_transform.local.rotate_angle_axis(Deg(40.0 * delta_time), vec3(0.0, 1.0, 0.0));
-                        //robot2_transform.local.rotate_angle_axis(Deg(-40.0 * delta_time), vec3(0.0, 1.0, 0.0));
-
                         script.advance();
                         if script.is_done()
                         {
@@ -492,7 +485,6 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
                         context.clear(Context::COLOR_BUFFER_BIT | Context::DEPTH_BUFFER_BIT);
 
 
-
                         // Setup scene graph
                         let mut nodes =
                             vec![
@@ -506,37 +498,37 @@ fn start(canvas_id: String, _resource_dir: String, resource_manager: Rc<RefCell<
                             ];
 
                         let script_data = script.current_data().expect("data available");
-                        let mut d1 = false;
-                        let mut d2 = false;
+
+                        // Transformation matrices. Matrices from the transformations are copied
+                        // into here to avoid borrowing errors since t.matrix() requires
+                        // a mutable transformation
+                        let mut matrices = Vec::with_capacity(script_data.len());
+
                         for data in script_data
                         {
-                            if data.id == "Dolphin0"
+                            // Either get the existing transformation for the robot or
+                            // create a new one
+                            let t = match transformations.get_mut(&data.id)
                             {
-                                robot1_transform.global.set_translation(vec3(data.x_pos, 0.25, data.y_pos));
-                                d1 = true;
-                            }
-                            if data.id == "Dolphin1"
-                            {
-                                robot2_transform.global.set_translation(vec3(data.x_pos, 0.25, data.y_pos));
-                                d2 = true;
-                            }
+                                Some(t) => t,
+                                None => transformations.entry(data.id.to_owned()).or_default()
+                            };
+
+                            // Apply the robot's position and orientation
+                            t.global.set_translation(vec3(data.x_pos, 0.25, data.y_pos));
+                            t.local.set_orientation_angle_axis(Deg(data.rotation), vec3(0.0, 1.0, 0.0));
+                            // Add the transformation matrix
+                            matrices.push(t.matrix().clone());
                         }
 
-                        if d1
+                        // Add the render nodes for the robots
+                        for matrix in &matrices
                         {
                             nodes.push(Node(
                                 &robot_renderable,
-                                robot1_transform.matrix(),
+                                matrix,
                                 None
                             ));
-                        }
-                        if d2
-                        {
-                            nodes.push(Node(
-                                    &robot_renderable,
-                                    robot2_transform.matrix(),
-                                    None
-                                ));
                         }
 
                         renderer.render(&context, &manager.borrow(), perspective * camera.borrow().view_matrix(), &nodes);
