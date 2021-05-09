@@ -16,6 +16,7 @@ class WasmHandler(SimpleHTTPRequestHandler):
 if sys.version_info < (3, 7, 5):
     WasmHandler.extensions_map['.wasm'] = 'application/wasm'
 
+WasmHandler.extensions_map['.js'] = 'text/javascript'
 
 if __name__ == '__main__':
     PORT = 8080
