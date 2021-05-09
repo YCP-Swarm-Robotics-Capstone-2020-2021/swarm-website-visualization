@@ -97,7 +97,6 @@ fn log_s(s: String)
     log(s.as_str());
 }
 
-
 #[wasm_bindgen]
 pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Result<(), JsValue>
 {
@@ -164,14 +163,8 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
         "texture_frag.glsl",
         resources.remove(0).expect("texture_frag.glsl"));
 
-    start(canvas_id, resource_dir, Rc::new(RefCell::new(resource_manager))).await
-        .expect("visualization start() func");
+    wrap!(resource_manager);
 
-    Ok(())
-}
-
-async fn start(canvas_id: String, resource_dir: String, resource_manager: Rc<RefCell<ResourceManager>>) -> Result<(), JsValue>
-{
     // Get HTML element references
     let window: Window = window().expect("window context");
     let document: Document = window.document().expect("document context");
