@@ -98,6 +98,9 @@ fn log_s(s: String)
 }
 
 #[wasm_bindgen]
+/// Initialize and start the visualization software
+/// `canvas_id` is the ID of the HTML canvas element to render the visualization to
+/// `resource_dir` is the directory containing resources for the visualization (textures, models, etc)
 pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Result<(), JsValue>
 {
     let canvas_id = 
@@ -132,9 +135,10 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
     let mut resource_manager = ResourceManager::new();
 
     let mut resource_urls = vec![
-        "models/robot.obj".to_string(),
+        "models/dolphin.obj".to_string(),
         "models/room.obj".to_string(),
         "images/tex_atlas.pbm".to_string(),
+        "images/robot_tex.pbm".to_string(),
         "shaders/texture_vert.glsl".to_string(),
         "shaders/texture_frag.glsl".to_string(),
     ];
@@ -156,6 +160,9 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
     resource_manager.insert_with_name(
         "tex_atlas.pbm",
         resources.remove(0).expect("tex_atlas.pbm"));
+    resource_manager.insert_with_name(
+        "robot_tex.pbm",
+        resources.remove(0).expect("robot_tex.pbm"));
     resource_manager.insert_with_name(
         "texture_vert.glsl",
         resources.remove(0).expect("texture_vert.glsl"));
@@ -221,8 +228,8 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
 
     let robot_obj = resource_manager.borrow().get_by_name("robot.obj").expect("robot obj resource").clone();
     let robot_mesh = Mesh::from_reader(&*robot_obj).expect("robot mesh");
-    let room_obj = resource_manager.borrow().get_by_name("room.obj").expect("room obj resource").clone();
-    let room_mesh = Mesh::from_reader(&*room_obj).expect("room mesh");
+    let skybox_obj = resource_manager.borrow().get_by_name("room.obj").expect("skybox obj resource").clone();
+    let skybox_mesh = Mesh::from_reader(&*skybox_obj).expect("skybox mesh");
 
     // Setup object manager
     let manager = Rc::new(RefCell::new(GlObjectManager::new()));
@@ -230,9 +237,9 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
 
 
     // Texture atlas
-    let tex_atlas_pbm = resource_manager.borrow().get_by_name("tex_atlas.pbm").expect("texture atlas").clone();
+    let skybox_tex_pbm = resource_manager.borrow().get_by_name("tex_atlas.pbm").expect("texture atlas").clone();
 
-    let texture_atlas_handle = manager_ref.insert_texture2d(
+    let skybox_texture_handle = manager_ref.insert_texture2d(
         Texture2d::new(&context, Texture2dParams
         {
             target: Context::TEXTURE_2D,
@@ -241,12 +248,30 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
             size: (800, 400),
             wrap_type: Context::REPEAT,
             filter_type: Context::LINEAR,
-            data: tex_atlas_pbm
-        }).expect("texture")
+            data: skybox_tex_pbm
+        }).expect("texture atlas")
     );
     {
-        Texture2d::bind(&manager_ref, texture_atlas_handle);
-        manager_ref.get_texture2d(texture_atlas_handle).expect("atlas texture2d").setup_texture().expect("texture2d setup");
+        Texture2d::bind(&manager_ref, skybox_texture_handle);
+        manager_ref.get_texture2d(skybox_texture_handle).expect("skybox texture2d").setup_texture().expect("texture2d setup");
+    }
+
+    let robot_tex_pbm = resource_manager.borrow().get_by_name("robot_tex.pbm").expect("robot texture").clone();
+    let robot_texture_handle = manager_ref.insert_texture2d(
+        Texture2d::new(&context, Texture2dParams
+        {
+            target: Context::TEXTURE_2D,
+            internal_format: Context::RGB8,
+            format: Context::RGB,
+            size: (640, 427),
+            wrap_type: Context::REPEAT,
+            filter_type: Context::LINEAR,
+            data: robot_tex_pbm
+        }).expect("robot texture")
+    );
+    {
+        Texture2d::bind(&manager_ref, robot_texture_handle);
+        manager_ref.get_texture2d(robot_texture_handle).expect("robot texture2d").setup_texture().expect("texture2d setup");
     }
 
     let robot_vao_handle = manager_ref.insert_vertex_array(
@@ -291,34 +316,34 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
         ElementArrayBuffer::unbind(&manager_ref, elem_buff_handle);
     }
 
-    let room_vao_handle = manager_ref.insert_vertex_array(
-        VertexArray::new(&context).expect("room vertex array")
+    let skybox_vao_handle = manager_ref.insert_vertex_array(
+        VertexArray::new(&context).expect("skybox vertex array")
     );
 
     {
         let arr_buff_handle = manager_ref.insert_array_buffer(
-            ArrayBuffer::new(&context).expect("room array buffer")
+            ArrayBuffer::new(&context).expect("skybox array buffer")
         );
 
         let elem_buff_handle = manager_ref.insert_element_array_buffer(
-            ElementArrayBuffer::new(&context).expect("room element array buffer")
+            ElementArrayBuffer::new(&context).expect("skybox element array buffer")
         );
-        VertexArray::bind(&manager_ref, room_vao_handle);
-        // Setup the vertex array buffer with the room vertices
+        VertexArray::bind(&manager_ref, skybox_vao_handle);
+        // Setup the vertex array buffer with the skybox vertices
         ArrayBuffer::bind(&manager_ref, arr_buff_handle);
         {
-            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("room array buffer");
-            arr_buff.buffer_data(&room_mesh.vertices, Context::STATIC_DRAW);
+            let mut arr_buff = manager_ref.get_mut_array_buffer(arr_buff_handle).expect("skybox array buffer");
+            arr_buff.buffer_data(&skybox_mesh.vertices, Context::STATIC_DRAW);
         }
-        // Setup the element array buffer with the room indices
+        // Setup the element array buffer with the skybox indices
         ElementArrayBuffer::bind(&manager_ref, elem_buff_handle);
         {
-            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("room element array buffer");
-            elem_arr_buff.buffer_data(&room_mesh.indices, Context::STATIC_DRAW);
+            let mut elem_arr_buff = manager_ref.get_mut_element_array_buffer(elem_buff_handle).expect("skybox element array buffer");
+            elem_arr_buff.buffer_data(&skybox_mesh.indices, Context::STATIC_DRAW);
         }
         // Register the vertex and element array buffers with the VAO
         {
-            let mut vert_arr = manager_ref.get_mut_vertex_array(room_vao_handle).expect("room vertex array");
+            let mut vert_arr = manager_ref.get_mut_vertex_array(skybox_vao_handle).expect("skybox vertex array");
 
             let attribs = vec![
                 AttribPointer::without_defaults(0, 3, Context::FLOAT, false, std::mem::size_of::<Vertex>() as i32, offset_of!(Vertex, position) as i32),
@@ -328,7 +353,7 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
             vert_arr.register_array_buffer(arr_buff_handle, Some(attribs));
             vert_arr.register_element_array_buffer(elem_buff_handle, None);
         }
-        VertexArray::unbind(&manager_ref, room_vao_handle);
+        VertexArray::unbind(&manager_ref, skybox_vao_handle);
         ArrayBuffer::unbind(&manager_ref, arr_buff_handle);
         ElementArrayBuffer::unbind(&manager_ref, elem_buff_handle);
     }
@@ -354,17 +379,17 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
     // Setup render information
     let robot_renderable = RenderDto
     {
-        tex_handle: texture_atlas_handle,
+        tex_handle: robot_texture_handle,
         vert_arr_handle: robot_vao_handle,
         num_indices: robot_mesh.indices.len() as i32,
     };
 
-    let mut room_transform = Transformation::new();
-    let room_renderable = RenderDto
+    let mut skybox_transform = Transformation::new();
+    let skybox_renderable = RenderDto
     {
-        tex_handle: texture_atlas_handle,
-        vert_arr_handle: room_vao_handle,
-        num_indices: room_mesh.indices.len() as i32,
+        tex_handle: skybox_texture_handle,
+        vert_arr_handle: skybox_vao_handle,
+        num_indices: skybox_mesh.indices.len() as i32,
     };
 
     let perspective = cgmath::perspective(Deg(45.0f32), canvas_size.0 as f32 / canvas_size.1 as f32, 0.1f32, 50.0f32);
@@ -481,8 +506,8 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
                         let mut nodes =
                             vec![
                                 Node(
-                                    &room_renderable,
-                                    room_transform.matrix(),
+                                    &skybox_renderable,
+                                    skybox_transform.matrix(),
                                     Some(vec![
 
                                     ]),
