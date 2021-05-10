@@ -103,7 +103,7 @@ fn log_s(s: String)
 /// `resource_dir` is the directory containing resources for the visualization (textures, models, etc)
 pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Result<(), JsValue>
 {
-    let canvas_id = 
+    let canvas_id =
         {
             if canvas_id.is_empty()
             {
@@ -115,7 +115,7 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
                 canvas_id.to_owned()
             }
         };
-    let resource_dir = 
+    let resource_dir =
         {
             if resource_dir.is_empty()
             {
@@ -448,12 +448,35 @@ pub async fn init_visualization(canvas_id: String, resource_dir: String) -> Resu
 
     let script_str =
         {
-            let name = "scripts/test_script.script".to_owned();
-            let dir = resource_dir.to_owned() + &name;
-            let resource = async_loader::load(dir).await.expect("downloaded test script");
+            let mut search: String = window.location().search().expect("search field");
+
+            let script_dir =
+                {
+                    // default path
+                    let mut dir: String = resource_dir.to_owned() + "scripts/test_script.script";
+                    if !search.is_empty()
+                    {
+                        // Remove '?' from start
+                        search.remove(0);
+                        // Iterate through any key=value pairs
+                        let mut iter = search.split("=");
+                        while let Some(lhs) = iter.next()
+                        {
+                            if lhs == "script"
+                            {
+                                if let Some(rhs) = iter.next()
+                                {
+                                    dir = "/scripts/".to_owned() + rhs;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    dir
+                };
+            let resource = async_loader::load(script_dir).await.expect("downloaded script");
             let string = String::from_utf8(resource.to_owned()).expect("script as string");
-            borrow_mut!(resource_manager);
-            resource_manager.insert_with_name(name, resource);
 
             string
         };
